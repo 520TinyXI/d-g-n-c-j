@@ -207,7 +207,7 @@ class Main(Star):
         img.save("uncongrats_result.jpg")
         return CommandResult().file_image("uncongrats_result.jpg")
 
-    @filter.command("moe")
+    @filter.command("随机动漫图片")
     async def get_moe(self, message: AstrMessageEvent):
         """随机动漫图片"""
         shuffle = random.sample(self.moe_urls, len(self.moe_urls))
@@ -494,6 +494,193 @@ class Main(Star):
         except Exception as e:
             logger.error(f"生成奖状时发生错误：{e}")
             return CommandResult().error(f"生成奖状时发生错误：{str(e)}")
+
+    @filter.command("高铁动车车票查询")
+    async def highspeed_ticket_query(self, message: AstrMessageEvent):
+        """高铁动车车票查询器"""
+        # 解析参数：高铁动车车票查询 出发地 终点地 查询时间（可选）
+        msg = message.message_str.replace("高铁动车车票查询", "").strip()
+        
+        if not msg:
+            return CommandResult().error("示例：高铁动车车票查询 北京 上海 2024-01-28")
+        
+        # 分割参数
+        parts = msg.split()
+        if len(parts) < 2:
+            return CommandResult().error("示例：高铁动车车票查询 北京 上海 2024-01-28")
+        
+        from_city = parts[0]
+        to_city = parts[1]
+        time_param = parts[2] if len(parts) > 2 else ""
+        
+        api_url = "https://api.pearktrue.cn/api/highspeedticket"
+        params = f"from={urllib.parse.quote(from_city)}&to={urllib.parse.quote(to_city)}"
+        if time_param:
+            params += f"&time={urllib.parse.quote(time_param)}"
+        url = f"{api_url}?{params}"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("查询车票信息失败")
+                    
+                    data = await resp.json()
+                    
+                    if data.get("code") == 200 and "data" in data and len(data["data"]) > 0:
+                        # 取第一个结果
+                        result = data["data"][0]
+                        ticket_info = result.get("ticket_info", [{}])[0] if result.get("ticket_info") else {}
+                        
+                        # 构建输出结果
+                        output = f"状态信息：{data.get('msg', '')}\n"
+                        output += f"出发地：{data.get('from', '')}\n"
+                        output += f"终点地：{data.get('to', '')}\n"
+                        output += f"查询时间：{data.get('time', '')}\n"
+                        output += f"获取数量：{data.get('count', '')}\n"
+                        output += f"返回内容：{data.get('data', '')}\n"
+                        output += f"车辆类型：{result.get('traintype', '')}\n"
+                        output += f"车辆代码：{result.get('trainumber', '')}\n"
+                        output += f"出发点：{result.get('departstation', '')}\n"
+                        output += f"终点站：{result.get('arrivestation', '')}\n"
+                        output += f"出发时间：{result.get('departtime', '')}\n"
+                        output += f"到达时间：{result.get('arrivetime', '')}\n"
+                        output += f"过程时间：{result.get('runtime', '')}\n"
+                        output += f"车辆车票信息：{result.get('ticket_info', '')}\n"
+                        output += f"座次等级：{ticket_info.get('seatname', '')}\n"
+                        output += f"车票状态：{ticket_info.get('bookable', '')}\n"
+                        output += f"车票价格：{ticket_info.get('seatprice', '')}\n"
+                        output += f"剩余车票数量：{ticket_info.get('seatinventory', '')}"
+                        
+                        return CommandResult().message(output)
+                    else:
+                        return CommandResult().error(f"未找到车票信息：{data.get('msg', '未知错误')}")
+                        
+        except Exception as e:
+            logger.error(f"查询车票信息时发生错误：{e}")
+            return CommandResult().error(f"查询车票信息时发生错误：{str(e)}")
+
+    @filter.command("全国高校查询")
+    async def college_query(self, message: AstrMessageEvent):
+        """全国高校查询器"""
+        # 解析参数：全国高校查询 keyword
+        msg = message.message_str.replace("全国高校查询", "").strip()
+        
+        if not msg:
+            return CommandResult().error("示例：全国高校查询 医科")
+        
+        keyword = msg
+        api_url = "https://api.pearktrue.cn/api/college/"
+        params = f"keyword={urllib.parse.quote(keyword)}"
+        url = f"{api_url}?{params}"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("查询高校信息失败")
+                    
+                    data = await resp.json()
+                    
+                    if data.get("code") == 200 and "data" in data and len(data["data"]) > 0:
+                        # 取第一个结果
+                        result = data["data"][0]
+                        
+                        # 构建输出结果
+                        output = f"状态信息：{data.get('msg', '')}\n"
+                        output += f"获取数量：{data.get('count', '')}\n"
+                        output += f"返回内容：{data.get('data', '')}\n"
+                        output += f"名称：{result.get('name', '')}\n"
+                        output += f"部门：{result.get('department', '')}\n"
+                        output += f"城市：{result.get('city', '')}\n"
+                        output += f"教育等级：{result.get('level', '')}\n"
+                        output += f"办学性质：{result.get('remark', '')}"
+                        
+                        return CommandResult().message(output)
+                    else:
+                        return CommandResult().error(f"未找到高校信息：{data.get('msg', '未知错误')}")
+                        
+        except Exception as e:
+            logger.error(f"查询高校信息时发生错误：{e}")
+            return CommandResult().error(f"查询高校信息时发生错误：{str(e)}")
+
+    @filter.command("商标信息查询")
+    async def trademark_search(self, message: AstrMessageEvent):
+        """商标信息查询器"""
+        # 解析参数：商标信息查询 keyword
+        msg = message.message_str.replace("商标信息查询", "").strip()
+        
+        if not msg:
+            return CommandResult().error("示例：商标信息查询 光头强")
+        
+        keyword = msg
+        api_url = "https://api.pearktrue.cn/api/trademark/"
+        params = f"keyword={urllib.parse.quote(keyword)}"
+        url = f"{api_url}?{params}"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("查询商标信息失败")
+                    
+                    data = await resp.json()
+                    
+                    if data.get("code") == 200 and "data" in data and len(data["data"]) > 0:
+                        # 取第一个结果
+                        result = data["data"][0]
+                        
+                        # 构建输出结果
+                        output = f"状态信息：{data.get('msg', '')}\n"
+                        output += f"搜索商标：{data.get('keyword', '')}\n"
+                        output += f"返回数量：{data.get('count', '')}\n"
+                        output += f"注册号：{result.get('regNo', '')}\n"
+                        output += f"办理机构：{result.get('agent', '')}\n"
+                        output += f"注册公告日期：{result.get('regDate', '')}\n"
+                        output += f"申请日期：{result.get('appDate', '')}\n"
+                        output += f"商标状态：{result.get('statusStr', '')}\n"
+                        output += f"国际分类值：{result.get('intCls', '')}\n"
+                        output += f"国际分类名：{result.get('clsStr', '')}\n"
+                        output += f"申请人名称：{result.get('applicantCn', '')}\n"
+                        output += f"商标名称：{result.get('tmName', '')}\n"
+                        output += f"商标图片：{result.get('tmImgOssPath', '')}"
+                        
+                        return CommandResult().message(output)
+                    else:
+                        return CommandResult().error(f"未找到商标信息：{data.get('msg', '未知错误')}")
+                        
+        except Exception as e:
+            logger.error(f"查询商标信息时发生错误：{e}")
+            return CommandResult().error(f"查询商标信息时发生错误：{str(e)}")
+
+    @filter.command("脑筋急转弯")
+    async def brain_teaser(self, message: AstrMessageEvent):
+        """脑筋急转弯生成器"""
+        api_url = "https://api.pearktrue.cn/api/brainteasers/"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("获取脑筋急转弯失败")
+                    
+                    data = await resp.json()
+                    
+                    if data.get("code") == 200 and "data" in data:
+                        question = data["data"].get("question", "")
+                        answer = data["data"].get("answer", "")
+                        
+                        if question and answer:
+                            result = f"来啦来啦！\n题目是：{question}\n答案：{answer}"
+                            return CommandResult().message(result)
+                        else:
+                            return CommandResult().error("获取到的脑筋急转弯数据不完整")
+                    else:
+                        return CommandResult().error(f"API返回错误：{data.get('msg', '未知错误')}")
+                        
+        except Exception as e:
+            logger.error(f"获取脑筋急转弯时发生错误：{e}")
+            return CommandResult().error(f"获取脑筋急转弯时发生错误：{str(e)}")
 
     @filter.regex(r"^(早安|晚安)")
     async def good_morning(self, message: AstrMessageEvent):
