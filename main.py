@@ -583,18 +583,19 @@ class Main(Star):
                     data = await resp.json()
                     
                     if data.get("code") == 200 and "data" in data and len(data["data"]) > 0:
-                        # 取第一个结果
-                        result = data["data"][0]
-                        
                         # 构建输出结果
                         output = f"状态信息：{data.get('msg', '')}\n"
                         output += f"获取数量：{data.get('count', '')}\n"
-                        output += f"返回内容：{data.get('data', '')}\n"
-                        output += f"名称：{result.get('name', '')}\n"
-                        output += f"部门：{result.get('department', '')}\n"
-                        output += f"城市：{result.get('city', '')}\n"
-                        output += f"教育等级：{result.get('level', '')}\n"
-                        output += f"办学性质：{result.get('remark', '')}"
+                        output += f"返回内容：\n\n"
+                        
+                        # 遍历所有结果
+                        for i, result in enumerate(data["data"], 1):
+                            output += f"=== 学校 {i} ===\n"
+                            output += f"名称：{result.get('name', '')}\n"
+                            output += f"部门：{result.get('department', '')}\n"
+                            output += f"城市：{result.get('city', '')}\n"
+                            output += f"教育等级：{result.get('level', '')}\n"
+                            output += f"办学性质：{result.get('remark', '')}\n\n"
                         
                         return CommandResult().message(output)
                     else:
@@ -627,23 +628,24 @@ class Main(Star):
                     data = await resp.json()
                     
                     if data.get("code") == 200 and "data" in data and len(data["data"]) > 0:
-                        # 取第一个结果
-                        result = data["data"][0]
-                        
                         # 构建输出结果
                         output = f"状态信息：{data.get('msg', '')}\n"
                         output += f"搜索商标：{data.get('keyword', '')}\n"
-                        output += f"返回数量：{data.get('count', '')}\n"
-                        output += f"注册号：{result.get('regNo', '')}\n"
-                        output += f"办理机构：{result.get('agent', '')}\n"
-                        output += f"注册公告日期：{result.get('regDate', '')}\n"
-                        output += f"申请日期：{result.get('appDate', '')}\n"
-                        output += f"商标状态：{result.get('statusStr', '')}\n"
-                        output += f"国际分类值：{result.get('intCls', '')}\n"
-                        output += f"国际分类名：{result.get('clsStr', '')}\n"
-                        output += f"申请人名称：{result.get('applicantCn', '')}\n"
-                        output += f"商标名称：{result.get('tmName', '')}\n"
-                        output += f"商标图片：{result.get('tmImgOssPath', '')}"
+                        output += f"返回数量：{data.get('count', '')}\n\n"
+                        
+                        # 遍历所有结果
+                        for i, result in enumerate(data["data"], 1):
+                            output += f"=== 商标 {i} ===\n"
+                            output += f"注册号：{result.get('regNo', '')}\n"
+                            output += f"办理机构：{result.get('agent', '')}\n"
+                            output += f"注册公告日期：{result.get('regDate', '')}\n"
+                            output += f"申请日期：{result.get('appDate', '')}\n"
+                            output += f"商标状态：{result.get('statusStr', '')}\n"
+                            output += f"国际分类值：{result.get('intCls', '')}\n"
+                            output += f"国际分类名：{result.get('clsStr', '')}\n"
+                            output += f"申请人名称：{result.get('applicantCn', '')}\n"
+                            output += f"商标名称：{result.get('tmName', '')}\n"
+                            output += f"商标图片：{result.get('tmImgOssPath', '')}\n\n"
                         
                         return CommandResult().message(output)
                     else:
@@ -652,6 +654,70 @@ class Main(Star):
         except Exception as e:
             logger.error(f"查询商标信息时发生错误：{e}")
             return CommandResult().error(f"查询商标信息时发生错误：{str(e)}")
+
+    @filter.command("王者战力查询")
+    async def king_glory_power_query(self, message: AstrMessageEvent):
+        """王者荣耀战力查询器"""
+        # 解析参数：王者战力查询 平台 英雄名称
+        msg = message.message_str.replace("王者战力查询", "").strip()
+        
+        if not msg:
+            return CommandResult().error("正确指令：王者战力查询 游戏平台（qq (安卓QQ，默认)、 wx (安卓微信)、 pqq (苹果QQ)、 pwx (苹果微信)）英雄名称\n\n示例：王者战力查询 qq 孙悟空")
+        
+        # 分割参数
+        parts = msg.split()
+        if len(parts) < 2:
+            return CommandResult().error("正确指令：王者战力查询 游戏平台（qq (安卓QQ，默认)、 wx (安卓微信)、 pqq (苹果QQ)、 pwx (苹果微信)）英雄名称\n\n示例：王者战力查询 qq 孙悟空")
+        
+        platform = parts[0].lower()
+        hero_name = " ".join(parts[1:])  # 支持英雄名称包含空格
+        
+        # 验证平台参数
+        valid_platforms = ['qq', 'wx', 'pqq', 'pwx']
+        if platform not in valid_platforms:
+            return CommandResult().error(f"无效的游戏平台：{platform}\n支持的平台：qq (安卓QQ，默认)、 wx (安卓微信)、 pqq (苹果QQ)、 pwx (苹果微信)")
+        
+        # API配置
+        api_key = 'sSY2pUwle7dFzA4Vr6r'
+        api_url = 'https://api.yaohud.cn/api/v6/wzzl'
+        
+        # 构建请求参数
+        params = {
+            'key': api_key,
+            'name': hero_name,
+            'lei': platform
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("查询王者战力失败")
+                    
+                    data = await resp.json()
+                    
+                    if data.get("code") == 200 and "data" in data:
+                        hero_data = data["data"]
+                        
+                        # 构建输出结果
+                        output = f"英雄名称：{hero_data.get('name', '')}\n"
+                        output += f"游戏平台：{hero_data.get('platform', '')}\n"
+                        output += f"国标战力：{hero_data.get('guobiao', '')}\n"
+                        output += f"省标地区名称：{hero_data.get('shengbiao_name', '')}\n"
+                        output += f"省标最低战力：{hero_data.get('shengbiao', '')}\n"
+                        output += f"市标地区名称：{hero_data.get('shibiao_name', '')}\n"
+                        output += f"市标最低战力：{hero_data.get('shibiao', '')}\n"
+                        output += f"区标地区名称：{hero_data.get('qubiao_name', '')}\n"
+                        output += f"区标最低战力：{hero_data.get('qubiao', '')}\n"
+                        output += f"更新时间：{hero_data.get('update_time', '')}\n"
+                        
+                        return CommandResult().message(output)
+                    else:
+                        return CommandResult().error(f"未找到英雄战力信息：{data.get('msg', '未知错误')}")
+                        
+        except Exception as e:
+            logger.error(f"查询王者战力时发生错误：{e}")
+            return CommandResult().error(f"查询王者战力时发生错误：{str(e)}")
 
     @filter.command("脑筋急转弯")
     async def brain_teaser(self, message: AstrMessageEvent):
