@@ -689,31 +689,40 @@ class Main(Star):
         }
         
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(api_url, params=params) as resp:
-                    if resp.status != 200:
-                        return CommandResult().error("查询王者战力失败")
-                    
-                    data = await resp.json()
-                    
-                    if data.get("code") == 200 and "data" in data:
-                        hero_data = data["data"]
+            # 设置超时和重试机制
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                try:
+                    async with session.get(api_url, params=params) as resp:
+                        if resp.status != 200:
+                            return CommandResult().error("查询王者战力失败，服务器返回错误状态码")
                         
-                        # 构建输出结果
-                        output = f"英雄名称：{hero_data.get('name', '')}\n"
-                        output += f"游戏平台：{hero_data.get('platform', '')}\n"
-                        output += f"国标战力：{hero_data.get('guobiao', '')}\n"
-                        output += f"省标地区名称：{hero_data.get('shengbiao_name', '')}\n"
-                        output += f"省标最低战力：{hero_data.get('shengbiao', '')}\n"
-                        output += f"市标地区名称：{hero_data.get('shibiao_name', '')}\n"
-                        output += f"市标最低战力：{hero_data.get('shibiao', '')}\n"
-                        output += f"区标地区名称：{hero_data.get('qubiao_name', '')}\n"
-                        output += f"区标最低战力：{hero_data.get('qubiao', '')}\n"
-                        output += f"更新时间：{hero_data.get('update_time', '')}\n"
+                        data = await resp.json()
                         
-                        return CommandResult().message(output)
-                    else:
-                        return CommandResult().error(f"未找到英雄战力信息：{data.get('msg', '未知错误')}")
+                        if data.get("code") == 200 and "data" in data:
+                            hero_data = data["data"]
+                            
+                            # 构建输出结果
+                            output = f"英雄名称：{hero_data.get('name', '')}\n"
+                            output += f"游戏平台：{hero_data.get('platform', '')}\n"
+                            output += f"国标战力：{hero_data.get('guobiao', '')}\n"
+                            output += f"省标地区名称：{hero_data.get('shengbiao_name', '')}\n"
+                            output += f"省标最低战力：{hero_data.get('shengbiao', '')}\n"
+                            output += f"市标地区名称：{hero_data.get('shibiao_name', '')}\n"
+                            output += f"市标最低战力：{hero_data.get('shibiao', '')}\n"
+                            output += f"区标地区名称：{hero_data.get('qubiao_name', '')}\n"
+                            output += f"区标最低战力：{hero_data.get('qubiao', '')}\n"
+                            output += f"更新时间：{hero_data.get('update_time', '')}\n"
+                            
+                            return CommandResult().message(output)
+                        else:
+                            return CommandResult().error(f"未找到英雄战力信息：{data.get('msg', '未知错误')}")
+                except aiohttp.ClientError as e:
+                    logger.error(f"网络连接错误：{e}")
+                    return CommandResult().error("无法连接到王者战力查询服务器，请稍后重试或检查网络连接")
+                except asyncio.TimeoutError:
+                    logger.error("请求超时")
+                    return CommandResult().error("查询超时，请稍后重试")
                         
         except Exception as e:
             logger.error(f"查询王者战力时发生错误：{e}")
