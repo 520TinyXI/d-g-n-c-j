@@ -439,24 +439,20 @@ class Main(Star):
     @filter.command("生成奖状")
     async def generate_certificate(self, message: AstrMessageEvent):
         """在线奖状生成器"""
-        # 解析参数：/生成奖状 name title &classname
+        # 解析参数：生成奖状 name title classname
         msg = message.message_str.replace("生成奖状", "").strip()
         parts = msg.split()
         
         if len(parts) < 3:
-            return CommandResult().error("格式：/生成奖状 name title &classname")
+            return CommandResult().error("示例：生成奖状 良子 三好学生 阳光小学9年级4班")
         
         name = parts[0]
         title = parts[1]
-        # 查找 & 符号后的 classname
-        classname = ""
-        for i, part in enumerate(parts[2:], 2):
-            if part.startswith("&"):
-                classname = part[1:] + " " + " ".join(parts[i+1:])
-                break
+        # classname为剩余所有部分
+        classname = " ".join(parts[2:])
         
         if not classname:
-            return CommandResult().error("格式：/生成奖状 name title &classname\n注意：classname前需要加&符号")
+            return CommandResult().error("示例：生成奖状 良子 三好学生 阳光小学9年级4班")
         
         # 检查参数长度限制
         if len(name) > 3:
