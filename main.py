@@ -502,12 +502,12 @@ class Main(Star):
         msg = message.message_str.replace("高铁动车车票查询", "").strip()
         
         if not msg:
-            return CommandResult().error("示例：高铁动车车票查询 北京 上海 2024-01-28")
+            return CommandResult().error("示例：高铁动车车票查询 北京 上海 2024-01-28（可选填日期，不填则查询今日）")
         
         # 分割参数
         parts = msg.split()
         if len(parts) < 2:
-            return CommandResult().error("示例：高铁动车车票查询 北京 上海 2024-01-28")
+            return CommandResult().error("示例：高铁动车车票查询 北京 上海 2024-01-28（可选填日期，不填则查询今日）")
         
         from_city = parts[0]
         to_city = parts[1]
@@ -520,12 +520,15 @@ class Main(Star):
         url = f"{api_url}?{params}"
         
         try:
+            logger.info(f"正在查询车票信息，URL：{url}")
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as resp:
+                    logger.info(f"API响应状态码：{resp.status}")
                     if resp.status != 200:
-                        return CommandResult().error("查询车票信息失败")
+                        return CommandResult().error(f"查询车票信息失败，服务器状态码：{resp.status}")
                     
                     data = await resp.json()
+                    logger.info(f"API返回数据：{data}")
                     
                     if data.get("code") == 200 and "data" in data and len(data["data"]) > 0:
                         # 取第一个结果
@@ -554,7 +557,55 @@ class Main(Star):
                         
                         return CommandResult().message(output)
                     else:
-                        return CommandResult().error(f"未找到车票信息：{data.get('msg', '未知错误')}")
+                        # 如果带日期参数查询失败，尝试不带日期的查询
+                        if time_param:
+                            logger.info("带日期参数查询失败，尝试不带日期的查询")
+                            fallback_url = f"{api_url}?from={urllib.parse.quote(from_city)}&to={urllib.parse.quote(to_city)}"
+                            logger.info(f"重试URL：{fallback_url}")
+                            
+                            async with session.get(fallback_url) as fallback_resp:
+                                if fallback_resp.status != 200:
+                                    error_msg = data.get('msg', '未知错误')
+                                    logger.error(f"API返回错误：code={data.get('code')}, msg={error_msg}")
+                                    return CommandResult().error(f"未找到车票信息：{error_msg}")
+                                
+                                fallback_data = await fallback_resp.json()
+                                logger.info(f"重试API返回数据：{fallback_data}")
+                                
+                                if fallback_data.get("code") == 200 and "data" in fallback_data and len(fallback_data["data"]) > 0:
+                                    # 取第一个结果
+                                    result = fallback_data["data"][0]
+                                    ticket_info = result.get("ticket_info", [{}])[0] if result.get("ticket_info") else {}
+                                    
+                                    # 构建输出结果
+                                    output = f"状态信息：{fallback_data.get('msg', '')}\n"
+                                    output += f"出发地：{fallback_data.get('from', '')}\n"
+                                    output += f"终点地：{fallback_data.get('to', '')}\n"
+                                    output += f"查询时间：{fallback_data.get('time', '')}\n"
+                                    output += f"获取数量：{fallback_data.get('count', '')}\n"
+                                    output += f"返回内容：{fallback_data.get('data', '')}\n"
+                                    output += f"车辆类型：{result.get('traintype', '')}\n"
+                                    output += f"车辆代码：{result.get('trainumber', '')}\n"
+                                    output += f"出发点：{result.get('departstation', '')}\n"
+                                    output += f"终点站：{result.get('arrivestation', '')}\n"
+                                    output += f"出发时间：{result.get('departtime', '')}\n"
+                                    output += f"到达时间：{result.get('arrivetime', '')}\n"
+                                    output += f"过程时间：{result.get('runtime', '')}\n"
+                                    output += f"车辆车票信息：{result.get('ticket_info', '')}\n"
+                                    output += f"座次等级：{ticket_info.get('seatname', '')}\n"
+                                    output += f"车票状态：{ticket_info.get('bookable', '')}\n"
+                                    output += f"车票价格：{ticket_info.get('seatprice', '')}\n"
+                                    output += f"剩余车票数量：{ticket_info.get('seatinventory', '')}"
+                                    
+                                    return CommandResult().message(output)
+                                else:
+                                    error_msg = fallback_data.get('msg', '未知错误')
+                                    logger.error(f"重试API返回错误：code={fallback_data.get('code')}, msg={error_msg}")
+                                    return CommandResult().error(f"未找到车票信息：{error_msg}")
+                        else:
+                            error_msg = data.get('msg', '未知错误')
+                            logger.error(f"API返回错误：code={data.get('code')}, msg={error_msg}")
+                            return CommandResult().error(f"未找到车票信息：{error_msg}")
                         
         except Exception as e:
             logger.error(f"查询车票信息时发生错误：{e}")
@@ -746,7 +797,7 @@ class Main(Star):
                         answer = data["data"].get("answer", "")
                         
                         if question and answer:
-                            result = f"来啦来啦！\n题目是：{question}\n答案：{answer}"
+                            result = f"脑筋急转弯来啦！！\n\n题目是：{question}\n\n答案：{answer}"
                             return CommandResult().message(result)
                         else:
                             return CommandResult().error("获取到的脑筋急转弯数据不完整")
@@ -850,3 +901,133 @@ class Main(Star):
                 )
                 .use_t2i(False)
             )
+
+    @filter.command("台词搜电影")
+    async def search_movie_by_lines(self, message: AstrMessageEvent):
+        """通过台词搜寻存在的电影"""
+        # 解析参数：台词搜电影 台词 爬取页数
+        msg = message.message_str.replace("台词搜电影", "").strip()
+        
+        if not msg:
+            return CommandResult().error("正确指令：台词搜电影 【台词】 【爬取页数】\n\n示例：台词搜电影 你还爱我吗 1")
+        
+        # 分割参数
+        parts = msg.split()
+        if len(parts) < 2:
+            return CommandResult().error("正确指令：台词搜电影 【台词】 【爬取页数】\n\n示例：台词搜电影 你还爱我吗 1")
+        
+        # 提取台词和页数
+        # 台词可能包含空格，所以最后一个参数是页数，其余是台词
+        page = parts[-1]
+        word = " ".join(parts[:-1])
+        
+        # 验证页数是否为数字
+        try:
+            page_int = int(page)
+            if page_int < 1:
+                return CommandResult().error("爬取页数必须大于0")
+        except ValueError:
+            return CommandResult().error("爬取页数必须是数字")
+        
+        # API配置
+        api_url = "https://api.pearktrue.cn/api/media/lines.php"
+        params = {
+            'word': word,
+            'page': page_int
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("查询电影信息失败")
+                    
+                    data = await resp.json()
+                    
+                    if data.get("code") == 200 and "data" in data:
+                        # 构建基础信息输出
+                        output = f"状态信息：{data.get('msg', '')}\n"
+                        output += f"台词：{data.get('word', '')}\n"
+                        output += f"获取影视数量：{data.get('count', '')}\n"
+                        output += f"目前页数：{data.get('now_page', '')}\n"
+                        output += f"最终页数：{data.get('last_page', '')}\n"
+                        output += f"返回内容：\n\n"
+                        
+                        # 遍历所有电影结果
+                        for i, movie in enumerate(data["data"], 1):
+                            output += f"=== 电影 {i} ===\n"
+                            output += f"图片：{movie.get('local_img', '')}\n"
+                            output += f"更新时间：{movie.get('update_time', '')}\n"
+                            output += f"标题：{movie.get('title', '')}\n"
+                            output += f"国家：{movie.get('area', '')}\n"
+                            output += f"标签：{movie.get('tags', '')}\n"
+                            output += f"导演：{movie.get('directors', '')}\n"
+                            output += f"演员：{movie.get('actors', '')}\n"
+                            output += f"zh_word：{movie.get('zh_word', '')}\n"
+                            output += f"all_zh_word：{', '.join(movie.get('all_zh_word', []))}\n\n"
+                        
+                        return CommandResult().message(output)
+                    else:
+                        return CommandResult().error(f"未找到相关电影：{data.get('msg', '未知错误')}")
+                        
+        except Exception as e:
+            logger.error(f"查询电影信息时发生错误：{e}")
+            return CommandResult().error(f"查询电影信息时发生错误：{str(e)}")
+
+    @filter.command("今日运势")
+    async def today_horoscope(self, message: AstrMessageEvent):
+        """查询今日星座运势"""
+        # 解析参数：今日运势 星座名
+        msg = message.message_str.replace("今日运势", "").strip()
+        
+        if not msg:
+            return CommandResult().error("正确指令：今日运势 星座名\n\n示例：今日运势 白羊")
+        
+        # 提取星座名
+        constellation = msg
+        
+        # API配置
+        api_url = "https://api.pearktrue.cn/api/xzys/"
+        params = {
+            'xz': constellation
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("查询星座运势失败")
+                    
+                    data = await resp.json()
+                    
+                    if data.get("code") == 200 and "data" in data:
+                        # 获取数据
+                        horoscope_data = data["data"]
+                        
+                        # 构建基础信息输出
+                        output = f"状态信息：{data.get('msg', '')}\n"
+                        output += f"星座：{data.get('xz', '')}\n"
+                        output += f"返回内容：\n\n"
+                        
+                        # 添加详细信息
+                        output += f"标题：{horoscope_data.get('title', '')}\n"
+                        output += f"时间：{horoscope_data.get('time', '')}\n"
+                        output += f"幸运色：{horoscope_data.get('luckycolor', '')}\n"
+                        output += f"幸运数字：{horoscope_data.get('luckynumber', '')}\n"
+                        output += f"幸运星座：{horoscope_data.get('luckyconstellation', '')}\n"
+                        output += f"简短的评论：{horoscope_data.get('shortcomment', '')}\n"
+                        output += f"全文：{horoscope_data.get('alltext', '')}\n\n"
+                        
+                        # 添加各方面运势
+                        output += f"爱情：\n{horoscope_data.get('lovetext', '')}\n\n"
+                        output += f"事业：\n{horoscope_data.get('worktext', '')}\n\n"
+                        output += f"金钱：\n{horoscope_data.get('moneytext', '')}\n\n"
+                        output += f"健康：\n{horoscope_data.get('healthtxt', '')}"
+                        
+                        return CommandResult().message(output)
+                    else:
+                        return CommandResult().error(f"未找到星座运势：{data.get('msg', '未知错误')}")
+                        
+        except Exception as e:
+            logger.error(f"查询星座运势时发生错误：{e}")
+            return CommandResult().error(f"查询星座运势时发生错误：{str(e)}")
