@@ -1322,8 +1322,10 @@ class Main(Star):
                     # 获取图片数据
                     image_data = await resp.read()
                     
-                    # 创建图片消息
-                    image = Image(image_data)
+                    # 创建图片消息（使用base64编码）
+                    import base64
+                    image_base64 = base64.b64encode(image_data).decode('utf-8')
+                    image = Image(f"data:image/png;base64,{image_base64}")
                     
                     # 构建输出结果
                     chain = MessageChain([
@@ -1342,3 +1344,62 @@ class Main(Star):
         except Exception as e:
             logger.error(f"明日方舟寻访时发生错误：{e}")
             return CommandResult().error(f"寻访失败：{str(e)}")
+
+    @filter.command("123网盘解析")
+    async def pan123_parse(self, message: AstrMessageEvent):
+        """123网盘直链解析"""
+        # 解析参数：123网盘解析 链接
+        msg = message.message_str.replace("123网盘解析", "").strip()
+        
+        # 检查是否提供了链接
+        if not msg:
+            return CommandResult().error("正确指令：123网盘解析 链接\n示例：123网盘解析 https://123.wq.cn")
+        
+        # 检查是否是有效的URL
+        if not msg.startswith(("http://", "https://")):
+            return CommandResult().error("正确指令：123网盘解析 链接\n示例：123网盘解析 https://123.wq.cn")
+        
+        # API配置
+        api_url = "https://api.pearktrue.cn/api/123panparse/"
+        params = {
+            "url": msg,
+            "pwd": "",
+            "Authorization": ""
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("解析失败：服务器错误")
+                    
+                    data = await resp.json()
+                    
+                    # 检查API响应
+                    if data.get("code") != 200:
+                        return CommandResult().error("文件信息获取失败！！！\n可能是服务器出现问题！\n如果文件超过100mb也会出现失败！")
+                    
+                    # 获取解析结果
+                    result_data = data.get("data", {})
+                    download_url = result_data.get("downloadurl", "")
+                    filename = result_data.get("filename", "未知文件")
+                    size = result_data.get("size", "未知大小")
+                    
+                    # 构建输出结果
+                    output = "解析成功！\n"
+                    output += f"文件名：{filename}\n"
+                    output += f"文件大小：{size}\n"
+                    output += "直链链接：\n"
+                    output += download_url
+                    
+                    return CommandResult().message(output)
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到解析服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("解析超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"123网盘解析时发生错误：{e}")
+            return CommandResult().error(f"解析失败：{str(e)}")
