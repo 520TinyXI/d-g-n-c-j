@@ -183,7 +183,7 @@ class Main(Star):
                 async with session.get("http://api.yuxli.cn/api/nongli.php") as resp:
                     if resp.status == 200:
                         result = await resp.text()
-                        return CommandResult().text(result)
+                        return CommandResult(chain=[Plain(result)])
                     else:
                         return CommandResult().error(f"获取农历信息失败，错误码：{resp.status}")
         except Exception as e:
