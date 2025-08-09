@@ -175,6 +175,63 @@ class Main(Star):
         img.save("congrats_result.jpg")
         return CommandResult().file_image("congrats_result.jpg")
 
+    @filter.command("查询天气")
+    async def weather_query(self, message: AstrMessageEvent):
+        """天气查询功能"""
+        message_str = message.message_str.replace("查询天气", "").strip()
+        
+        if not message_str:
+            return CommandResult().error("正确指令：查询天气 地区")
+        
+        city = message_str
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"http://api.yuxli.cn/api/tianqi.php?msg={urllib.parse.quote(city)}&b=1") as resp:
+                    if resp.status == 200:
+                        result = await resp.text()
+                        # 解析API返回的天气信息
+                        weather_data = self.parse_weather_data(result)
+                        return CommandResult(chain=[Plain(weather_data)])
+                    else:
+                        return CommandResult().error(f"获取天气信息失败，错误码：{resp.status}")
+        except Exception as e:
+            return CommandResult().error(f"查询天气信息时出现错误：{str(e)}")
+    
+    def parse_weather_data(self, api_result):
+        """解析天气API返回的数据并格式化输出"""
+        # 解析API返回的数据，提取城市、日期、温度、天气、风度、空气质量信息
+        # 按照用户要求的格式输出
+        
+        # 示例解析逻辑，根据实际API返回格式调整
+        parts = api_result.split('☁.')
+        formatted_output = ""
+        
+        i = 1
+        while i < len(parts):
+            part = parts[i]
+            if part.startswith("查询："):
+                city = part.replace("查询：", "").strip()
+                formatted_output += f"☁城市：{city}\n"
+            elif part.startswith("日期："):
+                date = part.replace("日期：", "").strip()
+                formatted_output += f"☁日期：{date}\n"
+            elif part.startswith("温度："):
+                temp = part.replace("温度：", "").strip()
+                formatted_output += f"☁温度：{temp}\n"
+            elif part.startswith("天气："):
+                weather = part.replace("天气：", "").strip()
+                formatted_output += f"☁天气：{weather}\n"
+            elif part.startswith("风度："):
+                wind = part.replace("风度：", "").strip()
+                formatted_output += f"☁风度：{wind}\n"
+            elif part.startswith("空气质量："):
+                air_quality = part.replace("空气质量：", "").strip()
+                formatted_output += f"☁空气质量：{air_quality}\n\n"
+            i += 1
+        
+        return formatted_output.strip()
+
     @filter.command("农历查询")
     async def lunar_calendar_query(self, message: AstrMessageEvent):
         """农历查询功能"""
@@ -183,7 +240,9 @@ class Main(Star):
                 async with session.get("http://api.yuxli.cn/api/nongli.php") as resp:
                     if resp.status == 200:
                         result = await resp.text()
-                        return CommandResult(chain=[Plain(result)])
+                        # 将换行符替换为空格，实现单行输出
+                        formatted_result = result.replace('\n', ' ').strip()
+                        return CommandResult(chain=[Plain(formatted_result)])
                     else:
                         return CommandResult().error(f"获取农历信息失败，错误码：{resp.status}")
         except Exception as e:
@@ -325,6 +384,33 @@ class Main(Star):
         )
 
         return CommandResult().message(result_text).use_t2i(False)
+
+    @filter.command("原神随机图片")
+    async def genshin_random_image(self, message: AstrMessageEvent):
+        """原神随机图片"""
+        try:
+            # 设置User-Agent模拟浏览器访问
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get("http://api.xiaomei520.sbs/api/元神/?", headers=headers) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error(f"获取图片失败: {resp.status}")
+                    
+                    data = await resp.read()
+            
+            # 保存图片到本地
+            try:
+                with open("genshin_image.jpg", "wb") as f:
+                    f.write(data)
+                return CommandResult().file_image("genshin_image.jpg")
+            except Exception as e:
+                return CommandResult().error(f"保存图片失败: {e}")
+                
+        except Exception as e:
+            return CommandResult().error(f"请求失败: {e}")
 
     @filter.command("蔚蓝档案随机图片")
     async def blue_archive_random_image(self, message: AstrMessageEvent):
@@ -1645,3 +1731,36 @@ class Main(Star):
         except Exception as e:
             logger.error(f"搜图时发生错误：{e}")
             return CommandResult().error(f"搜图失败：{str(e)}")
+
+    @filter.command("随机漫剪")
+    async def random_anime_clip(self, message: AstrMessageEvent):
+        """随机漫剪功能"""
+        # API配置
+        api_url = "http://api.xiaomei520.sbs/api/随机漫剪/?"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error(f"获取随机漫剪失败：服务器错误 (HTTP {resp.status})")
+                    
+                    # 直接读取视频数据
+                    video_data = await resp.read()
+                    
+                    # 保存视频到本地
+                    try:
+                        with open("random_anime_clip.mp4", "wb") as f:
+                            f.write(video_data)
+                        return CommandResult().file_video("random_anime_clip.mp4")
+                    except Exception as e:
+                        return CommandResult().error(f"保存视频失败: {e}")
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到随机漫剪服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("获取随机漫剪超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"获取随机漫剪时发生错误：{e}")
+            return CommandResult().error(f"获取随机漫剪失败：{str(e)}")
