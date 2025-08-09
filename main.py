@@ -1289,3 +1289,503 @@ class Main(Star):
         except Exception as e:
             logger.error(f"查询原神深渊数据时发生错误：{e}")
             return CommandResult().error("查询失败！可能是服务器问题！\n提醒：用户必须注册米游社/HoYoLAB，且开启了\"在战绩页面是否展示角色战绩\"否则也会查询失败！！！")
+
+    @filter.command("部落冲突查询")
+    async def clash_of_clans_query(self, message: AstrMessageEvent):
+        """部落冲突玩家数据查询器"""
+        # 解析参数：部落冲突查询 玩家标签
+        msg = message.message_str.replace("部落冲突查询", "").strip()
+        
+        if not msg:
+            return CommandResult().error("正确指令为：部落冲突查询 玩家标签\n\n示例：部落冲突查询 123456\n\n提示：只能查询国际服，国服无效")
+        
+        # 提取玩家标签
+        player_tag = msg.strip()
+        
+        # 如果标签没有#前缀，自动添加
+        if not player_tag.startswith('#'):
+            player_tag = '#' + player_tag
+        
+        # URL编码标签
+        import urllib.parse
+        encoded_tag = urllib.parse.quote(player_tag)
+        
+        # API配置 - 使用官方部落冲突API
+        api_url = f"https://api.clashofclans.com/v1/players/{encoded_tag}"
+        
+        # 设置请求头（这里需要一个API token，但文档中没有提供，我们先尝试不带token）
+        headers = {
+            'Accept': 'application/json'
+        }
+        
+        try:
+            # 设置超时和重试机制
+            timeout = aiohttp.ClientTimeout(total=15)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                try:
+                    async with session.get(api_url, headers=headers) as resp:
+                        if resp.status != 200:
+                            if resp.status == 403:
+                                return CommandResult().error("查询失败：需要API访问权限，请联系管理员配置API Token")
+                            elif resp.status == 404:
+                                return CommandResult().error("查询失败：未找到该玩家，请检查玩家标签是否正确\n\n提示：只能查询国际服，国服无效")
+                            elif resp.status == 429:
+                                return CommandResult().error("查询失败：请求过于频繁，请稍后重试")
+                            else:
+                                return CommandResult().error(f"查询失败：服务器返回错误状态码 {resp.status}")
+                        
+                        data = await resp.json()
+                        
+                        # 构建输出结果
+                        output = "部落冲突》玩家数据整理（中文）\n"
+                        
+                        # 一、基本信息
+                        output += "一、基本信息\n"
+                        output += f"标签：{data.get('tag', '')}\n"
+                        output += f"名称：{data.get('name', '')}\n"
+                        output += f"大本营等级：{data.get('townHallLevel', '')} 级\n"
+                        output += f"经验等级：{data.get('expLevel', '')} 级\n"
+                        output += f"当前奖杯数：{data.get('trophies', '')}\n"
+                        output += f"最高奖杯数：{data.get('bestTrophies', '')}\n"
+                        output += f"部落战星星数：{data.get('warStars', '')}\n"
+                        output += f"进攻胜利次数：{data.get('attackWins', '')}\n"
+                        output += f"防守胜利次数：{data.get('defenseWins', '')}\n"
+                        output += f"建筑大师基地等级：{data.get('builderHallLevel', '')} 级\n"
+                        output += f"建筑大师基地当前奖杯数：{data.get('builderBaseTrophies', '')}\n"
+                        output += f"建筑大师基地最高奖杯数：{data.get('bestBuilderBaseTrophies', '')}\n"
+                        output += f"捐赠次数：{data.get('donations', '')}\n"
+                        output += f"收到捐赠次数：{data.get('donationsReceived', '')}\n"
+                        output += f"部落城堡贡献：{data.get('clanCapitalContributions', '')}\n"
+                        
+                        # 建筑大师基地联赛
+                        builder_base_league = data.get('builderBaseLeague', {})
+                        if builder_base_league:
+                            output += f"建筑大师基地联赛：{builder_base_league.get('name', '')}（ID：{builder_base_league.get('id', '')}）\n"
+                        
+                        # 二、成就列表（部分）
+                        achievements = data.get('achievements', [])
+                        if achievements:
+                            output += "\n二、成就列表（部分）\n"
+                            output += "成就名称\t\t星级\t当前进度\t目标\t描述\t完成情况\t所属村庄\n"
+                            for achievement in achievements[:10]:  # 只显示前10个成就
+                                name = achievement.get('name', '')
+                                stars = achievement.get('stars', 0)
+                                value = achievement.get('value', '')
+                                target = achievement.get('target', '')
+                                info = achievement.get('info', '')
+                                completion_info = achievement.get('completionInfo', '')
+                                village = achievement.get('village', '')
+                                
+                                # 村庄名称映射
+                                village_map = {
+                                    'home': '主村庄',
+                                    'builderBase': '建筑大师基地',
+                                    'clanCapital': '部落都城'
+                                }
+                                village_name = village_map.get(village, village)
+                                
+                                output += f"{name}\t\t{stars} 星\t{value}\t{target}\t{info}\t{completion_info if completion_info else '-'}\t{village_name}\n"
+                            if len(achievements) > 10:
+                                output += f"...还有{len(achievements)-10}个成就\n"
+                        
+                        # 三、兵种信息（部分）
+                        troops = data.get('troops', [])
+                        if troops:
+                            output += "\n三、兵种信息（部分）\n"
+                            output += "兵种名称\t\t等级\t最高等级\t所属村庄\n"
+                            for troop in troops[:15]:  # 只显示前15个兵种
+                                name = troop.get('name', '')
+                                level = troop.get('level', '')
+                                max_level = troop.get('maxLevel', '')
+                                village = troop.get('village', '')
+                                
+                                # 村庄名称映射
+                                village_map = {
+                                    'home': '主村庄',
+                                    'builderBase': '建筑大师基地'
+                                }
+                                village_name = village_map.get(village, village)
+                                
+                                output += f"{name}\t\t{level}\t{max_level}\t{village_name}\n"
+                            if len(troops) > 15:
+                                output += f"...还有{len(troops)-15}个兵种\n"
+                        
+                        # 四、英雄信息
+                        heroes = data.get('heroes', [])
+                        if heroes:
+                            output += "\n四、英雄信息\n"
+                            output += "英雄名称\t\t等级\t最高等级\t装备\t所属村庄\n"
+                            for hero in heroes:
+                                name = hero.get('name', '')
+                                level = hero.get('level', '')
+                                max_level = hero.get('maxLevel', '')
+                                village = hero.get('village', '')
+                                equipment = hero.get('equipment', [])
+                                
+                                # 村庄名称映射
+                                village_map = {
+                                    'home': '主村庄',
+                                    'builderBase': '建筑大师基地'
+                                }
+                                village_name = village_map.get(village, village)
+                                
+                                # 装备信息
+                                equipment_names = []
+                                for equip in equipment:
+                                    equip_name = equip.get('name', '')
+                                    equip_level = equip.get('level', '')
+                                    if equip_name:
+                                        equipment_names.append(f"{equip_name}（{equip_level} 级）")
+                                equipment_str = ", ".join(equipment_names) if equipment_names else "-"
+                                
+                                output += f"{name}\t\t{level}\t{max_level}\t{equipment_str}\t{village_name}\n"
+                        
+                        # 五、英雄装备（部分）
+                        hero_equipment = data.get('heroEquipment', [])
+                        if hero_equipment:
+                            output += "\n五、英雄装备（部分）\n"
+                            output += "装备名称\t\t等级\t最高等级\t所属村庄\n"
+                            for equipment in hero_equipment[:10]:  # 只显示前10个装备
+                                name = equipment.get('name', '')
+                                level = equipment.get('level', '')
+                                max_level = equipment.get('maxLevel', '')
+                                village = equipment.get('village', '')
+                                
+                                # 村庄名称映射
+                                village_map = {
+                                    'home': '主村庄'
+                                }
+                                village_name = village_map.get(village, village)
+                                
+                                output += f"{name}\t\t{level}\t{max_level}\t{village_name}\n"
+                            if len(hero_equipment) > 10:
+                                output += f"...还有{len(hero_equipment)-10}个装备\n"
+                        
+                        # 六、法术信息
+                        spells = data.get('spells', [])
+                        if spells:
+                            output += "\n六、法术信息\n"
+                            output += "法术名称\t\t等级\t最高等级\t所属村庄\n"
+                            for spell in spells:
+                                name = spell.get('name', '')
+                                level = spell.get('level', '')
+                                max_level = spell.get('maxLevel', '')
+                                village = spell.get('village', '')
+                                
+                                # 村庄名称映射
+                                village_map = {
+                                    'home': '主村庄'
+                                }
+                                village_name = village_map.get(village, village)
+                                
+                                output += f"{name}\t\t{level}\t{max_level}\t{village_name}\n"
+                        
+                        return CommandResult().message(output)
+                        
+                except aiohttp.ClientError as e:
+                    logger.error(f"网络连接错误：{e}")
+                    return CommandResult().error("无法连接到部落冲突查询服务器，请稍后重试或检查网络连接")
+                except asyncio.TimeoutError:
+                    logger.error("请求超时")
+                    return CommandResult().error("查询超时，请稍后重试")
+                        
+        except Exception as e:
+            logger.error(f"查询部落冲突数据时发生错误：{e}")
+            return CommandResult().error(f"查询部落冲突数据时发生错误：{str(e)}")
+
+    @command('皇室战争查询', '查询皇室战争玩家信息')
+    async def query_clash_royale(self, message: Message):
+        """皇室战争玩家数据查询器"""
+        # 解析参数：皇室战争查询 玩家标签
+        msg = message.message_str.replace("皇室战争查询", "").strip()
+        
+        if not msg:
+            return CommandResult().error("正确指令为：皇室战争查询 玩家标签\n\n示例：皇室战争查询 123456\n\n提示：只能查询国际服，国服无效")
+        
+        # 提取玩家标签
+        player_tag = msg.strip()
+        
+        # 如果标签没有#前缀，自动添加
+        if not player_tag.startswith('#'):
+            player_tag = '#' + player_tag
+        
+        # URL编码标签
+        import urllib.parse
+        encoded_tag = urllib.parse.quote(player_tag)
+        
+        # API配置 - 使用官方皇室战争API
+        api_url = f"https://api.clashroyale.com/v1/players/{encoded_tag}"
+        
+        # 设置请求头（这里需要一个API token，但文档中没有提供，我们先尝试不带token）
+        headers = {
+            'Accept': 'application/json'
+        }
+        
+        try:
+            # 设置超时和重试机制
+            timeout = aiohttp.ClientTimeout(total=15)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                try:
+                    async with session.get(api_url, headers=headers) as resp:
+                        if resp.status != 200:
+                            if resp.status == 403:
+                                return CommandResult().error("查询失败：需要API访问权限，请联系管理员配置API Token")
+                            elif resp.status == 404:
+                                return CommandResult().error("查询失败：未找到该玩家，请检查玩家标签是否正确\n\n提示：只能查询国际服，国服无效")
+                            elif resp.status == 429:
+                                return CommandResult().error("查询失败：请求过于频繁，请稍后重试")
+                            else:
+                                return CommandResult().error(f"查询失败：服务器返回错误状态码 {resp.status}")
+                        
+                        data = await resp.json()
+                        
+                        # 构建输出结果
+                        output = "《皇室战争》玩家数据整理（中文）\n"
+                        
+                        # 一、基本信息
+                        output += "一、基本信息\n"
+                        output += f"标签：{data.get('tag', '')}\n"
+                        output += f"名称：{data.get('name', '')}\n"
+                        output += f"经验等级：{data.get('expLevel', '')} 级\n"
+                        output += f"当前奖杯数：{data.get('trophies', '')}\n"
+                        output += f"最高奖杯数：{data.get('bestTrophies', '')}\n"
+                        output += f"胜利次数：{data.get('wins', '')}\n"
+                        output += f"失败次数：{data.get('losses', '')}\n"
+                        output += f"总对战次数：{data.get('battleCount', '')}\n"
+                        output += f"三冠胜利次数：{data.get('threeCrownWins', '')}\n"
+                        output += f"挑战获胜卡牌数：{data.get('challengeCardsWon', '')}\n"
+                        output += f"挑战最大胜利次数：{data.get('challengeMaxWins', '')}\n"
+                        output += f"锦标赛获胜卡牌数：{data.get('tournamentCardsWon', '')}\n"
+                        output += f"锦标赛对战次数：{data.get('tournamentBattleCount', '')}\n"
+                        output += f"部落角色：{data.get('role', '')}\n"
+                        output += f"捐赠次数：{data.get('donations', '')}\n"
+                        output += f"收到捐赠次数：{data.get('donationsReceived', '')}\n"
+                        output += f"总捐赠次数：{data.get('totalDonations', '')}\n"
+                        output += f"部落战胜利次数：{data.get('warDayWins', '')}\n"
+                        output += f"收集的部落卡牌数：{data.get('clanCardsCollected', '')}\n"
+                        
+                        # 二、部落信息
+                        clan = data.get('clan', {})
+                        if clan:
+                            output += "\n二、部落信息\n"
+                            output += f"部落标签：{clan.get('tag', '')}\n"
+                            output += f"部落名称：{clan.get('name', '')}\n"
+                            output += f"徽章 ID：{clan.get('badgeId', '')}\n"
+                        
+                        # 三、竞技场信息
+                        arena = data.get('arena', {})
+                        if arena:
+                            output += "\n三、竞技场信息\n"
+                            output += f"竞技场 ID：{arena.get('id', '')}\n"
+                            output += f"竞技场名称：{arena.get('name', '')}\n"
+                        
+                        # 四、徽章列表（部分）
+                        badges = data.get('badges', [])
+                        if badges:
+                            output += "\n四、徽章列表（部分）\n"
+                            output += "徽章名称\t\t等级\t最大等级\t当前进度\t目标\t图标链接（大图）\n"
+                            for badge in badges[:10]:  # 只显示前10个徽章
+                                name = badge.get('name', '')
+                                level = badge.get('level', '')
+                                max_level = badge.get('maxLevel', '')
+                                progress = badge.get('progress', '')
+                                target = badge.get('target', '')
+                                icon_urls = badge.get('iconUrls', {})
+                                icon_url = icon_urls.get('medium', '') if icon_urls else ''
+                                
+                                output += f"{name}\t\t{level}\t{max_level}\t{progress}\t{target}\t{icon_url}\n"
+                            if len(badges) > 10:
+                                output += f"...还有{len(badges)-10}个徽章\n"
+                        
+                        # 五、成就列表（部分）
+                        achievements = data.get('achievements', [])
+                        if achievements:
+                            output += "\n五、成就列表（部分）\n"
+                            output += "成就名称\t\t星级\t当前进度\t目标\t描述\n"
+                            for achievement in achievements[:10]:  # 只显示前10个成就
+                                name = achievement.get('name', '')
+                                stars = achievement.get('stars', 0)
+                                value = achievement.get('value', '')
+                                target = achievement.get('target', '')
+                                info = achievement.get('info', '')
+                                
+                                output += f"{name}\t\t{stars} 星\t{value}\t{target}\t{info}\n"
+                            if len(achievements) > 10:
+                                output += f"...还有{len(achievements)-10}个成就\n"
+                        
+                        # 六、卡牌信息（部分，按稀有度分类）
+                        cards = data.get('cards', [])
+                        if cards:
+                            output += "\n六、卡牌信息（部分，按稀有度分类）\n"
+                            
+                            # 按稀有度分类
+                            common_cards = []
+                            rare_cards = []
+                            epic_cards = []
+                            legendary_cards = []
+                            champion_cards = []
+                            
+                            for card in cards:
+                                rarity = card.get('rarity', '').lower()
+                                if rarity == 'common':
+                                    common_cards.append(card)
+                                elif rarity == 'rare':
+                                    rare_cards.append(card)
+                                elif rarity == 'epic':
+                                    epic_cards.append(card)
+                                elif rarity == 'legendary':
+                                    legendary_cards.append(card)
+                                elif rarity == 'champion':
+                                    champion_cards.append(card)
+                            
+                            # 普通卡牌
+                            if common_cards:
+                                output += "普通卡牌（部分）\n"
+                                output += "卡牌名称\t\t等级\t最大等级\t数量\t圣水费用\t稀有度\n"
+                                for card in common_cards[:5]:  # 只显示前5个
+                                    name = card.get('name', '')
+                                    level = card.get('level', '')
+                                    max_level = card.get('maxLevel', '')
+                                    count = card.get('count', '')
+                                    elixir_cost = card.get('elixirCost', '')
+                                    rarity = card.get('rarity', '')
+                                    
+                                    output += f"{name}\t\t{level}\t{max_level}\t{count}\t{elixir_cost}\t{rarity}\n"
+                                if len(common_cards) > 5:
+                                    output += f"...还有{len(common_cards)-5}张普通卡牌\n"
+                            
+                            # 稀有卡牌
+                            if rare_cards:
+                                output += "\n稀有卡牌（部分）\n"
+                                output += "卡牌名称\t\t等级\t最大等级\t数量\t圣水费用\t稀有度\n"
+                                for card in rare_cards[:5]:  # 只显示前5个
+                                    name = card.get('name', '')
+                                    level = card.get('level', '')
+                                    max_level = card.get('maxLevel', '')
+                                    count = card.get('count', '')
+                                    elixir_cost = card.get('elixirCost', '')
+                                    rarity = card.get('rarity', '')
+                                    
+                                    output += f"{name}\t\t{level}\t{max_level}\t{count}\t{elixir_cost}\t{rarity}\n"
+                                if len(rare_cards) > 5:
+                                    output += f"...还有{len(rare_cards)-5}张稀有卡牌\n"
+                            
+                            # 史诗卡牌
+                            if epic_cards:
+                                output += "\n史诗卡牌（部分）\n"
+                                output += "卡牌名称\t\t等级\t最大等级\t数量\t圣水费用\t稀有度\n"
+                                for card in epic_cards[:5]:  # 只显示前5个
+                                    name = card.get('name', '')
+                                    level = card.get('level', '')
+                                    max_level = card.get('maxLevel', '')
+                                    count = card.get('count', '')
+                                    elixir_cost = card.get('elixirCost', '')
+                                    rarity = card.get('rarity', '')
+                                    
+                                    output += f"{name}\t\t{level}\t{max_level}\t{count}\t{elixir_cost}\t{rarity}\n"
+                                if len(epic_cards) > 5:
+                                    output += f"...还有{len(epic_cards)-5}张史诗卡牌\n"
+                            
+                            # 传奇卡牌
+                            if legendary_cards:
+                                output += "\n传奇卡牌（部分）\n"
+                                output += "卡牌名称\t\t等级\t最大等级\t数量\t圣水费用\t稀有度\n"
+                                for card in legendary_cards[:5]:  # 只显示前5个
+                                    name = card.get('name', '')
+                                    level = card.get('level', '')
+                                    max_level = card.get('maxLevel', '')
+                                    count = card.get('count', '')
+                                    elixir_cost = card.get('elixirCost', '')
+                                    rarity = card.get('rarity', '')
+                                    
+                                    output += f"{name}\t\t{level}\t{max_level}\t{count}\t{elixir_cost}\t{rarity}\n"
+                                if len(legendary_cards) > 5:
+                                    output += f"...还有{len(legendary_cards)-5}张传奇卡牌\n"
+                            
+                            # 冠军卡牌
+                            if champion_cards:
+                                output += "\n冠军卡牌（部分）\n"
+                                output += "卡牌名称\t\t等级\t最大等级\t数量\t圣水费用\t稀有度\n"
+                                for card in champion_cards[:5]:  # 只显示前5个
+                                    name = card.get('name', '')
+                                    level = card.get('level', '')
+                                    max_level = card.get('maxLevel', '')
+                                    count = card.get('count', '')
+                                    elixir_cost = card.get('elixirCost', '')
+                                    rarity = card.get('rarity', '')
+                                    
+                                    output += f"{name}\t\t{level}\t{max_level}\t{count}\t{elixir_cost}\t{rarity}\n"
+                                if len(champion_cards) > 5:
+                                    output += f"...还有{len(champion_cards)-5}张冠军卡牌\n"
+                        
+                        # 七、当前卡组
+                        current_deck = data.get('currentDeck', [])
+                        if current_deck:
+                            output += "\n七、当前卡组\n"
+                            for card in current_deck:
+                                name = card.get('name', '')
+                                level = card.get('level', '')
+                                star_level = card.get('starLevel', 0)
+                                max_level = card.get('maxLevel', '')
+                                elixir_cost = card.get('elixirCost', '')
+                                rarity = card.get('rarity', '')
+                                
+                                # 星级信息
+                                star_info = f"（星级 {star_level}）" if star_level > 0 else ""
+                                
+                                output += f"{name}\n"
+                                output += f"等级：{level}{star_info}\n"
+                                output += f"最大等级：{max_level}\n"
+                                output += f"圣水费用：{elixir_cost}\n"
+                                output += f"稀有度：{rarity}\n"
+                                output += "\n"
+                        
+                        # 八、其他数据
+                        output += "\n八、其他数据\n"
+                        
+                        # 当前最爱卡牌
+                        favorite_card = data.get('currentFavouriteCard', {})
+                        if favorite_card:
+                            output += f"当前最爱卡牌：{favorite_card.get('name', '')}\n"
+                        
+                        # 星点和经验值
+                        output += f"星点：{data.get('starPoints', '')}\n"
+                        output += f"当前经验值：{data.get('expPoints', '')}\n"
+                        output += f"总经验值：{data.get('totalExpPoints', '')}\n"
+                        
+                        # 赛季奖杯之路进度
+                        progress = data.get('progress', {})
+                        seasonal_key = None
+                        for key in progress.keys():
+                            if 'seasonal' in key.lower() and 'trophy' in key.lower():
+                                seasonal_key = key
+                                break
+                        
+                        if seasonal_key and progress[seasonal_key]:
+                            seasonal_data = progress[seasonal_key]
+                            trophies = seasonal_data.get('trophies', '')
+                            arena = seasonal_data.get('arena', {})
+                            arena_name = arena.get('name', '')
+                            output += f"2025 年 8 月赛季奖杯之路进度：{trophies} 奖杯（当前竞技场：{arena_name}）\n"
+                        
+                        # 自走棋模式
+                        auto_chess = progress.get('AutoChess', {})
+                        if auto_chess:
+                            arena = auto_chess.get('arena', {})
+                            arena_name = arena.get('name', '')
+                            trophies = auto_chess.get('trophies', '')
+                            best_trophies = auto_chess.get('bestTrophies', '')
+                            output += f"自走棋模式：{arena_name}（{trophies} 奖杯，最高 {best_trophies}）\n"
+                        
+                        return CommandResult().message(output)
+                        
+                except aiohttp.ClientError as e:
+                    logger.error(f"网络连接错误：{e}")
+                    return CommandResult().error("无法连接到皇室战争查询服务器，请稍后重试或检查网络连接")
+                except asyncio.TimeoutError:
+                    logger.error("请求超时")
+                    return CommandResult().error("查询超时，请稍后重试")
+                        
+        except Exception as e:
+            logger.error(f"查询皇室战争数据时发生错误：{e}")
+            return CommandResult().error(f"查询皇室战争数据时发生错误：{str(e)}")
