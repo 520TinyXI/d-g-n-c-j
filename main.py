@@ -1460,7 +1460,7 @@ class Main(Star):
             logger.error(f"方舟寻访时发生错误：{e}")
             return CommandResult().error(f"方舟寻访失败：{str(e)}")
 
-    @filter.command("/随机游戏图片")
+    @filter.command("随机游戏图片")
     async def get_random_game_image(self, message: AstrMessageEvent):
         """随机游戏图片"""
         api_url = "https://api.52vmy.cn/api/img/tu/game"
@@ -1516,7 +1516,7 @@ class Main(Star):
             logger.error(f"获取游戏图片时发生错误：{e}")
             return CommandResult().error(f"获取游戏图片失败：{str(e)}")
 
-    @filter.command("/搜图")
+    @filter.command("搜图")
     async def search_360_image(self, message: AstrMessageEvent):
         """360搜图功能"""
         # 获取关键词
