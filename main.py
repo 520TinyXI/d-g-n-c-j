@@ -760,17 +760,38 @@ class Main(Star):
                             hero_data = data["data"]
                             
                             # 构建输出结果
-                            output = f"英雄名称：{hero_data.get('hero', '')}\n"
+                            output = f"英雄名称：{hero_data.get('name', '')}\n"
+                            output += f"英雄ID：{hero_data.get('heroId', '')}\n"
+                            output += f"英雄类型：{hero_data.get('hero_type', '')}\n"
                             output += f"游戏平台：{platform}\n"
                             output += f"前十最低战力：{hero_data.get('Top10', '')}\n"
                             output += f"前100最低战力：{hero_data.get('Top100', '')}\n"
-                            output += f"省标地区名称：{hero_data.get('province_name', '')}\n"
-                            output += f"省标最低战力：{hero_data.get('province_power', '')}\n"
-                            output += f"市标地区名称：{hero_data.get('city_name', '')}\n"
-                            output += f"市标最低战力：{hero_data.get('city_power', '')}\n"
-                            output += f"区标地区名称：{hero_data.get('area_name', '')}\n"
-                            output += f"区标最低战力：{hero_data.get('area_power', '')}\n"
-                            output += f"更新时间：{hero_data.get('update_time', '')}\n"
+                            
+                            # 显示省标信息（前5个）
+                            if 'province' in hero_data and hero_data['province']:
+                                output += "\n省标战力信息：\n"
+                                for i, province in enumerate(hero_data['province'][:5]):
+                                    output += f"  {i+1}. {province.get('loc', '')}: {province.get('val', '')}\n"
+                                if len(hero_data['province']) > 5:
+                                    output += f"  ...还有{len(hero_data['province'])-5}个省\n"
+                            
+                            # 显示市标信息（前5个）
+                            if 'city' in hero_data and hero_data['city']:
+                                output += "\n市标战力信息：\n"
+                                for i, city in enumerate(hero_data['city'][:5]):
+                                    output += f"  {i+1}. {city.get('loc', '')}: {city.get('val', '')}\n"
+                                if len(hero_data['city']) > 5:
+                                    output += f"  ...还有{len(hero_data['city'])-5}个城市\n"
+                            
+                            # 显示区标信息（前5个）
+                            if 'county' in hero_data and hero_data['county']:
+                                output += "\n区标战力信息：\n"
+                                for i, county in enumerate(hero_data['county'][:5]):
+                                    output += f"  {i+1}. {county.get('loc', '')}: {county.get('val', '')}\n"
+                                if len(hero_data['county']) > 5:
+                                    output += f"  ...还有{len(hero_data['county'])-5}个区县\n"
+                            
+                            output += f"\n更新时间：{hero_data.get('updatetime', '')}\n"
                             
                             return CommandResult().message(output)
                         else:
@@ -1042,16 +1063,122 @@ class Main(Star):
     @filter.command("查询原神基本信息")
     async def genshin_basic_info(self, message: AstrMessageEvent):
         """查询原神基本信息"""
-        # 解析参数：查询原神基本信息 游戏uid 所在服务器 深渊数据类型
+        # 解析参数：查询原神基本信息 游戏uid 所在服务器
         msg = message.message_str.replace("查询原神基本信息", "").strip()
         
         if not msg:
-            return CommandResult().error("正确指令为：查询原神基本信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神基本信息 123456 官服 1")
+            return CommandResult().error("正确指令为：查询原神基本信息 游戏uid 所在服务器\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n\n示例：/查询原神基本信息 123456 官服")
+        
+        # 分割参数
+        parts = msg.split()
+        if len(parts) < 2:
+            return CommandResult().error("正确指令为：查询原神基本信息 游戏uid 所在服务器\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n\n示例：/查询原神基本信息 123456 官服")
+        
+        # 提取UID和服务器
+        uid = parts[0]
+        server_name = parts[1]
+        
+        # 验证UID是否为数字
+        try:
+            uid_int = int(uid)
+            if uid_int < 100000000:
+                return CommandResult().error("游戏UID格式不正确")
+        except ValueError:
+            return CommandResult().error("游戏UID必须是数字")
+        
+        # 服务器名称映射
+        server_mapping = {
+            "官服": "cn_gf01",
+            "渠道服": "cn_qd01", 
+            "美洲服": "os_usa",
+            "欧洲服": "os_euro",
+            "亚洲服": "os_asia",
+            "繁体中文服": "os_cht"
+        }
+        
+        # 验证服务器名称
+        if server_name not in server_mapping:
+            return CommandResult().error("正确指令为：查询原神基本信息 游戏uid 所在服务器\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n\n示例：/查询原神基本信息 123456 官服")
+        
+        server_code = server_mapping[server_name]
+        
+        # API配置
+        api_url = "https://api.nilou.moe/v1/bbs/genshin/BasicInfo"
+        params = {
+            'uid': uid_int,
+            'server': server_code
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("查询失败！可能是服务器问题！\n提醒：用户必须注册米游社/HoYoLAB，且开启了\"在战绩页面是否展示角色详情\"否则也会查询失败！！！")
+                    
+                    data = await resp.json()
+                    
+                    # 检查API响应
+                    if "data" not in data:
+                        return CommandResult().error("查询失败！可能是服务器问题！\n提醒：用户必须注册米游社/HoYoLAB，且开启了\"在战绩页面是否展示角色详情\"否则也会查询失败！！！")
+                    
+                    game_data = data["data"]
+                    
+                    # 构建基本信息输出
+                    output = "原神基本信息整理（中文）\n"
+                    output += f"信息：{data.get('message', '成功')}\n"
+                    output += "数据详情：\n"
+                    
+                    # 角色信息
+                    characters = game_data.get('characters', [])
+                    if characters:
+                        output += "=== 角色信息 ===\n"
+                        for i, char in enumerate(characters[:5], 1):  # 只显示前5个角色
+                            output += f"角色{i}：{char.get('name', '')}（等级{char.get('level', '')}）\n"
+                        if len(characters) > 5:
+                            output += f"...还有{len(characters)-5}个角色\n"
+                    
+                    # 游戏统计数据
+                    stats = game_data.get('stats', {})
+                    if stats:
+                        output += "\n=== 游戏统计数据 ===\n"
+                        output += f"活跃天数：{stats.get('active_days', '')}\n"
+                        output += f"成就达成数：{stats.get('achievements', '')}\n"
+                        output += f"获得角色数：{stats.get('characters_number', '')}\n"
+                        output += f"深境螺旋：{stats.get('spiral_abyss', '')}\n"
+                    
+                    # 世界探索进度
+                    world_explorations = game_data.get('world_explorations', [])
+                    if world_explorations:
+                        output += "\n=== 世界探索进度 ===\n"
+                        for exploration in world_explorations:
+                            output += f"{exploration.get('name', '')}：{exploration.get('exploration_percentage', '')}%\n"
+                    
+                    # 尘歌壶信息
+                    homes = game_data.get('homes', [])
+                    if homes:
+                        output += "\n=== 尘歌壶信息 ===\n"
+                        for home in homes:
+                            output += f"{home.get('name', '')}：等级{home.get('level', '')}，访客数{home.get('visit_num', '')}\n"
+                    
+                    return CommandResult().message(output)
+                        
+        except Exception as e:
+            logger.error(f"查询原神基本信息时发生错误：{e}")
+            return CommandResult().error("查询失败！可能是服务器问题！\n提醒：用户必须注册米游社/HoYoLAB，且开启了\"在战绩页面是否展示角色详情\"否则也会查询失败！！！")
+
+    @filter.command("查询原神深渊信息")
+    async def genshin_abyss_info(self, message: AstrMessageEvent):
+        """查询原神深渊信息"""
+        # 解析参数：查询原神深渊信息 游戏uid 所在服务器 深渊数据类型
+        msg = message.message_str.replace("查询原神深渊信息", "").strip()
+        
+        if not msg:
+            return CommandResult().error("正确指令为：查询原神深渊信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神深渊信息 123456 官服 1")
         
         # 分割参数
         parts = msg.split()
         if len(parts) < 3:
-            return CommandResult().error("正确指令为：查询原神基本信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神基本信息 123456 官服 1")
+            return CommandResult().error("正确指令为：查询原神深渊信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神深渊信息 123456 官服 1")
         
         # 提取UID、服务器和深渊数据类型
         uid = parts[0]
@@ -1078,11 +1205,11 @@ class Main(Star):
         
         # 验证服务器名称
         if server_name not in server_mapping:
-            return CommandResult().error("正确指令为：查询原神基本信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神基本信息 123456 官服 1")
+            return CommandResult().error("正确指令为：查询原神深渊信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神深渊信息 123456 官服 1")
         
         # 验证深渊数据类型
         if abyss_type not in ["1", "2"]:
-            return CommandResult().error("正确指令为：查询原神基本信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神基本信息 123456 官服 1")
+            return CommandResult().error("正确指令为：查询原神深渊信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神深渊信息 123456 官服 1")
         
         server_code = server_mapping[server_name]
         abyss_type_int = int(abyss_type)
