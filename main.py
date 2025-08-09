@@ -83,7 +83,7 @@ class Main(Star):
         """更新用户的CD时间"""
         self.good_morning_cd[user_id] = current_time
 
-    @filter.event_message_type(filter.EventMessageType.ALL)
+    @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def handle_search_anime(self, message: AstrMessageEvent):
         """检查是否有搜番请求"""
         sender = message.get_sender_id()
