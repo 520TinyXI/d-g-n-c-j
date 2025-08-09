@@ -1520,7 +1520,7 @@ class Main(Star):
     async def search_360_image(self, message: AstrMessageEvent):
         """360搜图功能"""
         # 获取关键词
-        keyword = message.message_str.replace("/搜图", "").strip()
+        keyword = message.message_str.replace("搜图", "").strip()
         
         # 如果没有提供关键词，返回错误信息
         if not keyword:
