@@ -1847,14 +1847,34 @@ class Main(Star):
         
         # 如果没有输入任何内容
         if not user_input:
-            return CommandResult().error("正确指令：AI绘画 图像描述 [宽度] [高度] [提示词增强] [模型] [种子]")
+            error_msg = "正确指令：/AI绘画 图像描述（必填） 图像宽度（不必填） 图像高度（不必要） 提示词增强(true/false)（不必填） 模型（flux(默认)/kontext/turbo）（不必填） 种子(固定种子可重现相同图像)\n\n"
+            error_msg += "参数解释：\n\n"
+            error_msg += "图像描述（必填）：\n你的AI绘画的提示词\n\n"
+            error_msg += "图像宽度（不必填）：\n生成图片宽度\n\n"
+            error_msg += "图像高度（不必要）:\n生成图片高度\n\n"
+            error_msg += "提示词增强(是/不)（不必填）：\n增强你的提示词，生成的更准确！\n\n"
+            error_msg += "模型（flux(默认)/kontext/turbo）（不必填）\n模型不同生成的图片也不同\n\n"
+            error_msg += "种子(固定种子可重现相同图像）：\n类似我的世界地图种子，种子不同图像也不同\n种子相同则图像也相同\n\n"
+            error_msg += "示例：AI绘画 一只狗 10 10 是 turbo 123\n\n"
+            error_msg += "上面这个示例添加了所有参数，你不必填这么多的参数，你可以只填一两个，甚至可以只填图像描述即可生成图片"
+            return CommandResult().error(error_msg)
         
         # 分割输入内容
         parts = user_input.split()
         
         # 至少需要图像描述
         if len(parts) < 1:
-            return CommandResult().error("正确指令：AI绘画 图像描述 [宽度] [高度] [提示词增强] [模型] [种子]")
+            error_msg = "正确指令：/AI绘画 图像描述（必填） 图像宽度（不必填） 图像高度（不必要） 提示词增强(true/false)（不必填） 模型（flux(默认)/kontext/turbo）（不必填） 种子(固定种子可重现相同图像)\n\n"
+            error_msg += "参数解释：\n\n"
+            error_msg += "图像描述（必填）：\n你的AI绘画的提示词\n\n"
+            error_msg += "图像宽度（不必填）：\n生成图片宽度\n\n"
+            error_msg += "图像高度（不必要）:\n生成图片高度\n\n"
+            error_msg += "提示词增强(是/不)（不必填）：\n增强你的提示词，生成的更准确！\n\n"
+            error_msg += "模型（flux(默认)/kontext/turbo）（不必填）\n模型不同生成的图片也不同\n\n"
+            error_msg += "种子(固定种子可重现相同图像）：\n类似我的世界地图种子，种子不同图像也不同\n种子相同则图像也相同\n\n"
+            error_msg += "示例：AI绘画 一只狗 10 10 是 turbo 123\n\n"
+            error_msg += "上面这个示例添加了所有参数，你不必填这么多的参数，你可以只填一两个，甚至可以只填图像描述即可生成图片"
+            return CommandResult().error(error_msg)
         
         # 解析参数
         description = parts[0]  # 图像描述（必填）
