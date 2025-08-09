@@ -728,15 +728,21 @@ class Main(Star):
         if platform not in valid_platforms:
             return CommandResult().error(f"无效的游戏平台：{platform}\n支持的平台：qq (安卓QQ，默认)、 wx (安卓微信)、 pqq (苹果QQ)、 pwx (苹果微信)")
         
-        # API配置
-        api_key = 'sSY2pUwle7dFzA4Vr6r'
-        api_url = 'https://api.yaohud.cn/api/v6/wzzl'
+        # 平台映射到新API的type参数
+        platform_mapping = {
+            'qq': 'aqq',  # 安卓QQ
+            'wx': 'awx',  # 安卓微信
+            'pqq': 'iqq', # 苹果QQ
+            'pwx': 'iwx'  # 苹果微信
+        }
+        
+        # 新API配置
+        api_url = 'https://api.wzryqz.cn/gethero'
         
         # 构建请求参数
         params = {
-            'key': api_key,
-            'name': hero_name,
-            'lei': platform
+            'hero': hero_name,
+            'type': platform_mapping[platform]
         }
         
         try:
@@ -754,15 +760,16 @@ class Main(Star):
                             hero_data = data["data"]
                             
                             # 构建输出结果
-                            output = f"英雄名称：{hero_data.get('name', '')}\n"
-                            output += f"游戏平台：{hero_data.get('platform', '')}\n"
-                            output += f"国标战力：{hero_data.get('guobiao', '')}\n"
-                            output += f"省标地区名称：{hero_data.get('shengbiao_name', '')}\n"
-                            output += f"省标最低战力：{hero_data.get('shengbiao', '')}\n"
-                            output += f"市标地区名称：{hero_data.get('shibiao_name', '')}\n"
-                            output += f"市标最低战力：{hero_data.get('shibiao', '')}\n"
-                            output += f"区标地区名称：{hero_data.get('qubiao_name', '')}\n"
-                            output += f"区标最低战力：{hero_data.get('qubiao', '')}\n"
+                            output = f"英雄名称：{hero_data.get('hero', '')}\n"
+                            output += f"游戏平台：{platform}\n"
+                            output += f"前十最低战力：{hero_data.get('Top10', '')}\n"
+                            output += f"前100最低战力：{hero_data.get('Top100', '')}\n"
+                            output += f"省标地区名称：{hero_data.get('province_name', '')}\n"
+                            output += f"省标最低战力：{hero_data.get('province_power', '')}\n"
+                            output += f"市标地区名称：{hero_data.get('city_name', '')}\n"
+                            output += f"市标最低战力：{hero_data.get('city_power', '')}\n"
+                            output += f"区标地区名称：{hero_data.get('area_name', '')}\n"
+                            output += f"区标最低战力：{hero_data.get('area_power', '')}\n"
                             output += f"更新时间：{hero_data.get('update_time', '')}\n"
                             
                             return CommandResult().message(output)
@@ -1031,3 +1038,127 @@ class Main(Star):
         except Exception as e:
             logger.error(f"查询星座运势时发生错误：{e}")
             return CommandResult().error(f"查询星座运势时发生错误：{str(e)}")
+
+    @filter.command("查询原神基本信息")
+    async def genshin_basic_info(self, message: AstrMessageEvent):
+        """查询原神基本信息"""
+        # 解析参数：查询原神基本信息 游戏uid 所在服务器 深渊数据类型
+        msg = message.message_str.replace("查询原神基本信息", "").strip()
+        
+        if not msg:
+            return CommandResult().error("正确指令为：查询原神基本信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神基本信息 123456 官服 1")
+        
+        # 分割参数
+        parts = msg.split()
+        if len(parts) < 3:
+            return CommandResult().error("正确指令为：查询原神基本信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神基本信息 123456 官服 1")
+        
+        # 提取UID、服务器和深渊数据类型
+        uid = parts[0]
+        server_name = parts[1]
+        abyss_type = parts[2]
+        
+        # 验证UID是否为数字
+        try:
+            uid_int = int(uid)
+            if uid_int < 100000000:
+                return CommandResult().error("游戏UID格式不正确")
+        except ValueError:
+            return CommandResult().error("游戏UID必须是数字")
+        
+        # 服务器名称映射
+        server_mapping = {
+            "官服": "cn_gf01",
+            "渠道服": "cn_qd01", 
+            "美洲服": "os_usa",
+            "欧洲服": "os_euro",
+            "亚洲服": "os_asia",
+            "繁体中文服": "os_cht"
+        }
+        
+        # 验证服务器名称
+        if server_name not in server_mapping:
+            return CommandResult().error("正确指令为：查询原神基本信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神基本信息 123456 官服 1")
+        
+        # 验证深渊数据类型
+        if abyss_type not in ["1", "2"]:
+            return CommandResult().error("正确指令为：查询原神基本信息 游戏uid 所在服务器 深渊数据类型\n服务器有：官服 渠道服 美洲服 欧洲服 亚洲服 繁体中文服\n深渊数据类型提示：1为本期，2为上期\n\n示例：/查询原神基本信息 123456 官服 1")
+        
+        server_code = server_mapping[server_name]
+        abyss_type_int = int(abyss_type)
+        
+        # API配置
+        api_url = "https://api.nilou.moe/v1/bbs/genshin/AbyssInfo"
+        params = {
+            'uid': uid_int,
+            'server': server_code,
+            'type': abyss_type_int
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("查询失败！可能是服务器问题！\n提醒：用户必须注册米游社/HoYoLAB，且开启了\"在战绩页面是否展示角色详情\"否则也会查询失败！！！")
+                    
+                    data = await resp.json()
+                    
+                    # 检查API响应
+                    if "data" not in data:
+                        return CommandResult().error("查询失败！可能是服务器问题！\n提醒：用户必须注册米游社/HoYoLAB，且开启了\"在战绩页面是否展示角色详情\"否则也会查询失败！！！")
+                    
+                    game_data = data["data"]
+                    
+                    # 构建深渊数据输出
+                    output = "深境螺旋数据整理（中文）\n"
+                    output += f"信息：{data.get('message', '成功')}\n"
+                    output += "数据详情：\n"
+                    
+                    # 格式化时间戳
+                    start_time = game_data.get('start_time', '')
+                    end_time = game_data.get('end_time', '')
+                    
+                    def format_timestamp(timestamp):
+                        if not timestamp:
+                            return '无数据'
+                        try:
+                            import datetime
+                            dt = datetime.datetime.fromtimestamp(int(timestamp), datetime.timezone(datetime.timedelta(hours=8)))
+                            return dt.strftime('%Y 年 %m 月 %d 日 %H:%M:%S（时间戳：' + str(timestamp) + '，北京时间）')
+                        except:
+                            return f'时间戳：{timestamp}'
+                    
+                    output += f"期数 ID：{game_data.get('schedule_id', '')}\n"
+                    output += f"开始时间：{format_timestamp(start_time)}\n"
+                    output += f"结束时间：{format_timestamp(end_time)}\n"
+                    output += f"总战斗次数：{game_data.get('total_battle_times', '')}\n"
+                    output += f"总胜利次数：{game_data.get('total_win_times', '')}\n"
+                    output += f"最高层数：{game_data.get('max_floor', '')}\n"
+                    
+                    # 处理排名数据
+                    reveal_rank = game_data.get('reveal_rank', [])
+                    defeat_rank = game_data.get('defeat_rank', [])
+                    damage_rank = game_data.get('damage_rank', [])
+                    take_damage_rank = game_data.get('take_damage_rank', [])
+                    normal_skill_rank = game_data.get('normal_skill_rank', [])
+                    energy_skill_rank = game_data.get('energy_skill_rank', [])
+                    
+                    output += f"元素爆发排名：{reveal_rank if reveal_rank else '[]（无数据）'}\n"
+                    output += f"击败敌人排名：{defeat_rank if defeat_rank else '[]（无数据）'}\n"
+                    output += f"造成伤害排名：{damage_rank if damage_rank else '[]（无数据）'}\n"
+                    output += f"承受伤害排名：{take_damage_rank if take_damage_rank else '[]（无数据）'}\n"
+                    output += f"普通攻击排名：{normal_skill_rank if normal_skill_rank else '[]（无数据）'}\n"
+                    output += f"元素战技排名：{energy_skill_rank if energy_skill_rank else '[]（无数据）'}\n"
+                    
+                    floors = game_data.get('floors', [])
+                    output += f"楼层详情：{floors if floors else '[]（无数据）'}\n"
+                    output += f"总星数：{game_data.get('total_star', '')}\n"
+                    output += f"已解锁：{'是' if game_data.get('is_unlock', False) else '否'}\n"
+                    output += f"刚跳过的楼层：{'是' if game_data.get('is_just_skipped_floor', False) else '否'}\n"
+                    output += f"跳过的楼层：{game_data.get('skipped_floor', '')}"
+                    
+                    return CommandResult().message(output)
+                        
+        except Exception as e:
+            logger.error(f"查询原神深渊数据时发生错误：{e}")
+            return CommandResult().error("查询失败！可能是服务器问题！\n提醒：用户必须注册米游社/HoYoLAB，且开启了\"在战绩页面是否展示角色战绩\"否则也会查询失败！！！")
