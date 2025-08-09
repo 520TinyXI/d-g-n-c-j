@@ -1328,12 +1328,13 @@ class Main(Star):
                     image = Image(f"data:image/png;base64,{image_base64}")
                     
                     # 构建输出结果
-                    chain = MessageChain([
-                        Plain(f"明日方舟寻访模拟 - {pool_name}"),
-                        image
-                    ])
-                    
-                    return CommandResult(chain=chain, use_t2i_=False)
+                    return CommandResult(
+                        chain=[
+                            Plain(f"明日方舟寻访模拟 - {pool_name}"),
+                            image
+                        ],
+                        use_t2i_=False
+                    )
                         
         except aiohttp.ClientError as e:
             logger.error(f"网络连接错误：{e}")
@@ -1461,3 +1462,57 @@ class Main(Star):
         except Exception as e:
             logger.error(f"AI识图时发生错误：{e}")
             return CommandResult().error(f"识图失败：{str(e)}")
+
+    @filter.command("黑白图制作")
+    async def black_white_image(self, message: AstrMessageEvent):
+        """黑白图片制作功能"""
+        # 获取消息对象
+        message_obj = message.message_obj
+        
+        # 查找图片对象
+        image_obj = None
+        for i in message_obj.message:
+            if isinstance(i, Image):
+                image_obj = i
+                break
+        
+        # 如果没有找到图片，返回错误信息
+        if not image_obj:
+            return CommandResult().error("正确指令：黑白图制作 图片")
+        
+        # API配置
+        api_url = "https://api.52vmy.cn/api/img/heibai"
+        params = {
+            "url": image_obj.url
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("黑白图制作失败：服务器错误")
+                    
+                    data = await resp.json()
+                    
+                    # 检查API响应
+                    if data.get("code") != 200:
+                        msg = data.get("msg", "未知错误")
+                        return CommandResult().error(f"黑白图制作失败：{msg}")
+                    
+                    # 获取处理后的图片URL
+                    result_url = data.get("url")
+                    if not result_url:
+                        return CommandResult().error("黑白图制作失败：未获取到处理后的图片URL")
+                    
+                    # 直接返回处理后的图片
+                    return CommandResult().file_image(result_url)
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到黑白图制作服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("黑白图制作超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"黑白图制作时发生错误：{e}")
+            return CommandResult().error(f"黑白图制作失败：{str(e)}")
