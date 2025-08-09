@@ -1493,8 +1493,8 @@ class Main(Star):
             logger.error(f"查询部落冲突数据时发生错误：{e}")
             return CommandResult().error(f"查询部落冲突数据时发生错误：{str(e)}")
 
-    @command('皇室战争查询', '查询皇室战争玩家信息')
-    async def query_clash_royale(self, message: Message):
+    @filter.command('皇室战争查询')
+    async def query_clash_royale(self, message: AstrMessageEvent):
         """皇室战争玩家数据查询器"""
         # 解析参数：皇室战争查询 玩家标签
         msg = message.message_str.replace("皇室战争查询", "").strip()
