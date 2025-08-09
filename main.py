@@ -1333,7 +1333,7 @@ class Main(Star):
                         image
                     ])
                     
-                    return CommandResult().message(chain)
+                    return CommandResult(chain=chain, use_t2i_=False)
                         
         except aiohttp.ClientError as e:
             logger.error(f"网络连接错误：{e}")
