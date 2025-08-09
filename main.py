@@ -175,6 +175,20 @@ class Main(Star):
         img.save("congrats_result.jpg")
         return CommandResult().file_image("congrats_result.jpg")
 
+    @filter.command("农历查询")
+    async def lunar_calendar_query(self, message: AstrMessageEvent):
+        """农历查询功能"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get("http://api.yuxli.cn/api/nongli.php") as resp:
+                    if resp.status == 200:
+                        result = await resp.text()
+                        return CommandResult().text(result)
+                    else:
+                        return CommandResult().error(f"获取农历信息失败，错误码：{resp.status}")
+        except Exception as e:
+            return CommandResult().error(f"查询农历信息时出现错误：{str(e)}")
+
     @filter.command("悲报")
     async def uncongrats(self, message: AstrMessageEvent):
         """悲报生成器"""
@@ -337,15 +351,15 @@ class Main(Star):
         url = f"https://rba.kanostar.top/adapt?type={api_param}"
         
         try:
+            # 设置User-Agent模拟浏览器访问
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
             async with aiohttp.ClientSession() as session:
-                async with session.get(url) as resp:
+                async with session.get(url, headers=headers) as resp:
                     if resp.status != 200:
                         return CommandResult().error(f"获取图片失败: {resp.status}")
-                    
-                    # 检查响应类型是否为图片
-                    content_type = resp.headers.get('content-type', '')
-                    if not content_type.startswith('image/'):
-                        return CommandResult().error("API返回的不是图片数据")
                     
                     data = await resp.read()
             
@@ -1631,95 +1645,3 @@ class Main(Star):
         except Exception as e:
             logger.error(f"搜图时发生错误：{e}")
             return CommandResult().error(f"搜图失败：{str(e)}")
-
-    @filter.command("我的世界版本列表")
-    async def minecraft_version_list(self, message: AstrMessageEvent):
-        """我的世界版本列表功能"""
-        api_url = "https://mcapks.net/api/get-vslist.php"
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(api_url) as resp:
-                    if resp.status != 200:
-                        if resp.status == 400:
-                            return CommandResult().error("获取版本列表失败：请求参数无效 (HTTP 400)")
-                        elif resp.status == 404:
-                            return CommandResult().error("获取版本列表失败：指定版本不存在 (HTTP 404)")
-                        elif resp.status == 429:
-                            return CommandResult().error("获取版本列表失败：请求频率超限，请稍后重试 (HTTP 429)")
-                        elif resp.status == 500:
-                            return CommandResult().error("获取版本列表失败：服务器内部错误 (HTTP 500)")
-                        else:
-                            return CommandResult().error(f"获取版本列表失败：服务器错误 (HTTP {resp.status})")
-                    
-                    # 解析JSON响应
-                    try:
-                        data = await resp.json()
-                    except json.JSONDecodeError as e:
-                        logger.error(f"JSON解析错误：{e}")
-                        return CommandResult().error("获取版本列表失败：服务器返回了无效的JSON格式")
-                    
-                    # 检查API响应
-                    if not data.get("success"):
-                        msg = data.get("message", "未知错误")
-                        return CommandResult().error(f"获取版本列表失败：{msg}")
-                    
-                    # 获取版本数据
-                    if "data" not in data or "versions" not in data["data"]:
-                        return CommandResult().error("获取版本列表失败：未获取到版本数据")
-                    
-                    version_data = data["data"]
-                    total = version_data.get("total", 0)
-                    versions = version_data.get("versions", [])
-                    
-                    # 分批次输出，每次30个版本
-                    batch_size = 30
-                    messages = []
-                    
-                    # 分批处理版本数据
-                    for i in range(0, len(versions), batch_size):
-                        batch_versions = versions[i:i + batch_size]
-                        current_count = len(batch_versions)
-                        
-                        # 构建每批次的输出结果
-                        output = "是否成功：是\n"
-                        output += f"总数：{total}\n"
-                        output += f"当前显示数：{current_count}\n"
-                        output += "版本列表：\n\n"
-                        
-                        # 遍历当前批次的版本
-                        for version in batch_versions:
-                            version_num = version.get("version", "未知")
-                            is_beta = "是" if version.get("beta", False) else "否"
-                            date_str = version.get("date", "未知")
-                            size_str = version.get("size", "未知")
-                            
-                            # 格式化日期
-                            if date_str != "未知" and "-" in date_str:
-                                year, month, day = date_str.split("-")
-                                date_str = f"{year} 年 {int(month)} 月 {int(day)} 日"
-                            
-                            output += f"版本号: {version_num}\n"
-                            output += f"是否为测试版: {is_beta}\n"
-                            output += f"发布日期: {date_str}\n"
-                            output += f"大小: {size_str}\n\n"
-                        
-                        messages.append(output)
-                    
-                    # 构建消息链
-                    message_chain = []
-                    for output in messages:
-                        message_chain.append(Plain(output))
-                    
-                    # 返回所有批次的消息
-                    return CommandResult(chain=message_chain)
-                        
-        except aiohttp.ClientError as e:
-            logger.error(f"网络连接错误：{e}")
-            return CommandResult().error("无法连接到我的世界API服务器，请稍后重试或检查网络连接")
-        except asyncio.TimeoutError:
-            logger.error("请求超时")
-            return CommandResult().error("获取版本列表超时，请稍后重试")
-        except Exception as e:
-            logger.error(f"获取版本列表时发生错误：{e}")
-            return CommandResult().error(f"获取版本列表失败：{str(e)}")
