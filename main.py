@@ -1403,3 +1403,61 @@ class Main(Star):
         except Exception as e:
             logger.error(f"123网盘解析时发生错误：{e}")
             return CommandResult().error(f"解析失败：{str(e)}")
+
+    @filter.command("识图")
+    async def ai_image_recognition(self, message: AstrMessageEvent):
+        """AI识图功能"""
+        # 获取消息对象
+        message_obj = message.message_obj
+        
+        # 查找图片对象
+        image_obj = None
+        for i in message_obj.message:
+            if isinstance(i, Image):
+                image_obj = i
+                break
+        
+        # 如果没有找到图片，返回错误信息
+        if not image_obj:
+            return CommandResult().error("正确指令：识图 你发的图片")
+        
+        # API配置
+        api_url = "https://api.pearktrue.cn/api/airecognizeimg/"
+        
+        try:
+            # 设置超时
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                # 准备请求数据
+                payload = {
+                    "file": image_obj.url
+                }
+                
+                async with session.post(api_url, json=payload) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error("识图失败：服务器错误")
+                    
+                    data = await resp.json()
+                    
+                    # 检查API响应
+                    if data.get("code") != 200:
+                        msg = data.get("msg", "未知错误")
+                        return CommandResult().error(f"识图失败：{msg}")
+                    
+                    # 构建输出结果
+                    output = "状态信息：\n"
+                    output += f"{data.get('msg', '')}\n\n"
+                    output += "识别结果：\n"
+                    output += f"{data.get('result', '')}"
+                    
+                    return CommandResult().message(output)
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到识图服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("识图超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"AI识图时发生错误：{e}")
+            return CommandResult().error(f"识图失败：{str(e)}")
