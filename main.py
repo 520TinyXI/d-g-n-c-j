@@ -1733,112 +1733,6 @@ class Main(Star):
             logger.error(f"搜图时发生错误：{e}")
             return CommandResult().error(f"搜图失败：{str(e)}")
 
-
-
-    @filter.command("葫芦侠软件搜索")
-    async def huluxia_software_search(self, message: AstrMessageEvent):
-        """葫芦侠软件搜索功能"""
-        # 获取用户输入
-        user_input = message.message_str.replace("葫芦侠软件搜索", "").strip()
-        
-        # 如果没有输入任何内容
-        if not user_input:
-            return CommandResult().error("你倒是输入内容啊！！！")
-        
-        # 分割输入内容
-        parts = user_input.split()
-        
-        # 如果只有一个部分（只有软件名）
-        if len(parts) == 1:
-            software_name = parts[0]
-            # 调用API获取软件列表
-            api_url = "https://wwm.34bc.com/API/hlx_ruanjian.php"
-            params = {"msg": software_name}
-            
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(api_url, params=params) as resp:
-                        if resp.status != 200:
-                            return CommandResult().error(f"搜索软件失败：服务器错误 (HTTP {resp.status})")
-                        
-                        result = await resp.text()
-                        # 解析结果，格式化输出
-                        lines = []
-                        # 按数字分割软件信息
-                        import re
-                        software_items = re.split(r'\d+\.', result)
-                        # 移除第一个空元素
-                        if software_items and software_items[0].strip() == "":
-                            software_items = software_items[1:]
-                        
-                        for i, item in enumerate(software_items, 1):
-                            if item.strip():
-                                lines.append(f"{i}号软件：{item.strip()}")
-                        
-                        # 添加统计信息
-                        if "共搜索到" in result and "个" in result:
-                            match = re.search(r'共搜索到(\d+)个', result)
-                            if match:
-                                total_count = match.group(1)
-                                lines.append(f"\n共搜索到{total_count}个软件！！")
-                        else:
-                            lines.append("\n共搜索到多个软件！！")
-                        
-                        # 添加提示信息
-                        lines.append("\n加入序号发下载链接！！")
-                        
-                        return CommandResult(chain=[Plain("\n".join(lines))])
-                        
-            except aiohttp.ClientError as e:
-                logger.error(f"网络连接错误：{e}")
-                return CommandResult().error("无法连接到葫芦侠软件搜索服务器，请稍后重试或检查网络连接")
-            except asyncio.TimeoutError:
-                logger.error("请求超时")
-                return CommandResult().error("搜索软件超时，请稍后重试")
-            except Exception as e:
-                logger.error(f"搜索软件时发生错误：{e}")
-                return CommandResult().error(f"搜索软件失败：{str(e)}")
-        
-        # 如果有两个部分（软件名+序号）
-        elif len(parts) == 2:
-            software_name = parts[0]
-            try:
-                sequence_number = int(parts[1])
-            except ValueError:
-                return CommandResult().error("正确指令：葫芦侠软件搜索 软件名 下载序号链接")
-            
-            # 调用API获取下载链接
-            api_url = "https://wwm.34bc.com/API/hlx_ruanjian.php"
-            params = {"msg": software_name, "n": str(sequence_number)}
-            
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(api_url, params=params) as resp:
-                        if resp.status != 200:
-                            return CommandResult().error(f"获取下载链接失败：服务器错误 (HTTP {resp.status})")
-                        
-                        download_link = await resp.text()
-                        
-                        # 检查是否是有效的下载链接
-                        if download_link.startswith("http"):
-                            return CommandResult(chain=[Plain(f"下载链接：\n\n{download_link}")])
-                        else:
-                            return CommandResult().error("获取下载链接失败：返回了无效的链接格式")
-                        
-            except aiohttp.ClientError as e:
-                logger.error(f"网络连接错误：{e}")
-                return CommandResult().error("无法连接到葫芦侠软件搜索服务器，请稍后重试或检查网络连接")
-            except asyncio.TimeoutError:
-                logger.error("请求超时")
-                return CommandResult().error("获取下载链接超时，请稍后重试")
-            except Exception as e:
-                logger.error(f"获取下载链接时发生错误：{e}")
-                return CommandResult().error(f"获取下载链接失败：{str(e)}")
-        
-        # 如果输入格式错误
-        else:
-            return CommandResult().error("正确指令：葫芦侠软件搜索 软件名 下载序号链接")
-
     @filter.command("AI绘画")
     async def ai_image_generation(self, message: AstrMessageEvent):
         """AI绘画功能"""
@@ -1847,7 +1741,7 @@ class Main(Star):
         
         # 如果没有输入任何内容
         if not user_input:
-            error_msg = "正确指令：/AI绘画 图像描述（必填） 图像宽度（不必填） 图像高度（不必要） 提示词增强(true/false)（不必填） 模型（flux(默认)/kontext/turbo）（不必填） 种子(固定种子可重现相同图像)\n\n"
+            error_msg = "正确指令：AI绘画 图像描述 [宽度] [高度] [提示词增强] [模型] [种子]\n\n"
             error_msg += "参数解释：\n\n"
             error_msg += "图像描述（必填）：\n你的AI绘画的提示词\n\n"
             error_msg += "图像宽度（不必填）：\n生成图片宽度\n\n"
@@ -1859,12 +1753,12 @@ class Main(Star):
             error_msg += "上面这个示例添加了所有参数，你不必填这么多的参数，你可以只填一两个，甚至可以只填图像描述即可生成图片"
             return CommandResult().error(error_msg)
         
-        # 分割输入内容
+        # 分割参数
         parts = user_input.split()
         
         # 至少需要图像描述
         if len(parts) < 1:
-            error_msg = "正确指令：/AI绘画 图像描述（必填） 图像宽度（不必填） 图像高度（不必要） 提示词增强(true/false)（不必填） 模型（flux(默认)/kontext/turbo）（不必填） 种子(固定种子可重现相同图像)\n\n"
+            error_msg = "正确指令：AI绘画 图像描述 [宽度] [高度] [提示词增强] [模型] [种子]\n\n"
             error_msg += "参数解释：\n\n"
             error_msg += "图像描述（必填）：\n你的AI绘画的提示词\n\n"
             error_msg += "图像宽度（不必填）：\n生成图片宽度\n\n"
@@ -1877,61 +1771,34 @@ class Main(Star):
             return CommandResult().error(error_msg)
         
         # 解析参数
-        description = parts[0]  # 图像描述（必填）
-        width = None
-        height = None
-        enhance = None
-        model = None
-        seed = None
+        prompt = parts[0]  # 图像描述（必填）
+        width = parts[1] if len(parts) > 1 else None  # 图像宽度（可选）
+        height = parts[2] if len(parts) > 2 else None  # 图像高度（可选）
+        enhance = parts[3] if len(parts) > 3 else None  # 提示词增强（可选）
+        model = parts[4] if len(parts) > 4 else "flux"  # 模型（可选，默认flux）
+        seed = parts[5] if len(parts) > 5 else None  # 种子（可选）
         
-        # 解析可选参数
-        if len(parts) > 1:
-            try:
-                width = int(parts[1])
-                if width <= 0:
-                    return CommandResult().error("图像宽度必须大于0")
-            except ValueError:
-                return CommandResult().error("图像宽度必须是数字")
+        # 验证模型参数
+        valid_models = ["flux", "kontext", "turbo"]
+        if model and model not in valid_models:
+            return CommandResult().error(f"模型参数错误，可选值：{', '.join(valid_models)}")
         
-        if len(parts) > 2:
-            try:
-                height = int(parts[2])
-                if height <= 0:
-                    return CommandResult().error("图像高度必须大于0")
-            except ValueError:
-                return CommandResult().error("图像高度必须是数字")
+        # 构建API请求URL
+        api_url = "http://api.lvlong.xyz/api/ai_image"
+        params = {
+            "prompt": prompt
+        }
         
-        if len(parts) > 3:
-            enhance = parts[3]
-            if enhance not in ["是", "不", "true", "false"]:
-                return CommandResult().error("提示词增强必须是'是'、'不'、'true'或'false'")
-        
-        if len(parts) > 4:
-            model = parts[4]
-            if model not in ["flux", "kontext", "turbo"]:
-                return CommandResult().error("模型必须是'flux'、'kontext'或'turbo'")
-        
-        if len(parts) > 5:
-            try:
-                seed = int(parts[5])
-                if seed < 0:
-                    return CommandResult().error("种子必须是非负整数")
-            except ValueError:
-                return CommandResult().error("种子必须是整数")
-        
-        # 构建API请求参数
-        api_url = "https://api.lvlong.xyz/api/ai_image"
-        params = {"description": description}
-        
-        if width is not None:
+        # 添加可选参数
+        if width:
             params["width"] = width
-        if height is not None:
+        if height:
             params["height"] = height
-        if enhance is not None:
+        if enhance:
             params["enhance"] = enhance
-        if model is not None:
+        if model:
             params["model"] = model
-        if seed is not None:
+        if seed:
             params["seed"] = seed
         
         try:
@@ -1960,3 +1827,82 @@ class Main(Star):
         except Exception as e:
             logger.error(f"AI绘画时发生错误：{e}")
             return CommandResult().error(f"AI绘画失败：{str(e)}")
+
+    @filter.command("葫芦侠软件搜索")
+    async def hulux_software_search(self, message: AstrMessageEvent):
+        """葫芦侠软件搜索功能"""
+        # 获取用户输入
+        user_input = message.message_str.replace("葫芦侠软件搜索", "").strip()
+        
+        if not user_input:
+            return CommandResult().error("正确指令：葫芦侠软件搜索 软件名 下载序号链接")
+        
+        # 分割参数
+        parts = user_input.split()
+        
+        if len(parts) < 1:
+            return CommandResult().error("正确指令：葫芦侠软件搜索 软件名 下载序号链接")
+        
+        software_name = parts[0]  # 软件名（必填）
+        download_index = parts[1] if len(parts) > 1 else None  # 下载序号（可选）
+        
+        # 构建API请求URL
+        api_url = "https://api.xiaomei520.sbs/api/葫芦侠软件搜索/"
+        params = {
+            "name": software_name
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error(f"葫芦侠软件搜索失败：服务器错误 (HTTP {resp.status})")
+                    
+                    data = await resp.json()
+                    
+                    # 检查API响应
+                    if data.get("code") != 200:
+                        msg = data.get("msg", "未知错误")
+                        return CommandResult().error(f"葫芦侠软件搜索失败：{msg}")
+                    
+                    # 获取软件列表
+                    software_list = data.get("data", [])
+                    if not software_list:
+                        return CommandResult().error("未找到相关软件")
+                    
+                    # 如果指定了下载序号
+                    if download_index:
+                        try:
+                            index = int(download_index) - 1  # 转换为0基索引
+                            if 0 <= index < len(software_list):
+                                software = software_list[index]
+                                download_url = software.get("download_url")
+                                if download_url:
+                                    return CommandResult().message(f"下载链接：{download_url}")
+                                else:
+                                    return CommandResult().error("该软件没有下载链接")
+                            else:
+                                return CommandResult().error(f"下载序号超出范围，请选择1-{len(software_list)}")
+                        except ValueError:
+                            return CommandResult().error("下载序号必须是数字")
+                    else:
+                        # 显示软件列表
+                        output = f"找到 {len(software_list)} 个相关软件：\n\n"
+                        for i, software in enumerate(software_list, 1):
+                            output += f"{i}. {software.get('name', '未知软件')}\n"
+                            output += f"   版本：{software.get('version', '未知')}\n"
+                            output += f"   大小：{software.get('size', '未知')}\n"
+                            output += f"   下载量：{software.get('downloads', '未知')}\n\n"
+                        
+                        output += "请发送序号获取下载链接，例如：葫芦侠软件搜索 软件名 1"
+                        return CommandResult().message(output)
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到葫芦侠软件搜索服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("葫芦侠软件搜索超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"葫芦侠软件搜索时发生错误：{e}")
+            return CommandResult().error(f"葫芦侠软件搜索失败：{str(e)}")
