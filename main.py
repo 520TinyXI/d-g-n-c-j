@@ -1313,9 +1313,11 @@ class Main(Star):
         # API配置 - 使用官方部落冲突API
         api_url = f"https://api.clashofclans.com/v1/players/{encoded_tag}"
         
-        # 设置请求头（这里需要一个API token，但文档中没有提供，我们先尝试不带token）
+        # 设置请求头，使用用户提供的API密钥
+        api_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM2M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6IjJlNmI0YjkxLTMyNTEtNDcyYy1hZDIwLTZjZTIwMDBiMDU3MSIsImlhdCI6MTc1NDcyOTk0MCwic3ViIjoiZGV2ZWxvcGVyL2Q4OTRiNTA2LWI0ZGEtMzE3ZS0xMDAzLTY2MWVkNjY5MjM5MyIsInNjb3BlcyI6WyJjbGFzaCJdLCJsaW1pdHMiOlt7InRpZXIiOiJkZXZlbG9wZXIvc2lsdmVyIiwidHlwZSI6InRocm90dGxpbmcifSx7ImNpZHJzIjpbIjE1Ni4yMzguMjI0LjE5NyJdLCJ0eXBlIjoiY2xpZW50In1dfQ.69HbXepYNGtHdtEHNo5bDlch2roESpo9uOwB_UIVMpmrLlQXE0PaRED-n55B1mDnaLJr0SKCcgPfYxwxg6BtUA"
         headers = {
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {api_token}'
         }
         
         try:
@@ -1516,9 +1518,11 @@ class Main(Star):
         # API配置 - 使用官方皇室战争API
         api_url = f"https://api.clashroyale.com/v1/players/{encoded_tag}"
         
-        # 设置请求头（这里需要一个API token，但文档中没有提供，我们先尝试不带token）
+        # 设置请求头，使用用户提供的API密钥
+        api_token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiIsImtpZCI6IjI4YTMxOGY3LTAwMDAtYTFlYi03ZmExLTJjNzQzM3M2Y2NhNSJ9.eyJpc3MiOiJzdXBlcmNlbGwiLCJhdWQiOiJzdXBlcmNlbGw6Z2FtZWFwaSIsImp0aSI6ImViODBiYWU1LTE0NGEtNDczYy04MzY2LTFmZGY1ZDYzZDZjYSIsImlhdCI6MTc1NDcyOTg1NCwic3ViIjoiZGV2ZWxvcGVyL2VhMjQ1NGM2LTFkYzktNDk4YS1iMGU3LTZhNTUyYmI4Yzg2YiIsInNjb3BlcyI6WyJyb3lhbGUiXSwibGltaXRzIjpbeyJ0aWVyIjoiZGV2ZWxvcGVyL3NpbHZlciIsInR5cGUiOiJ0aHJvdHRsaW5nIn0seyJjaWRycyI6WyIxNTYuMjM4LjIyNC4xOTciXSwidHlwZSI6ImNsaWVudCJ9XX0.H3PwjBalexGm8QO8oTuRGp8_rpKIWEvuLXSbRJanmxCurvnPJXfnl_hfF6ZT58yfy1CvMs9n0emtir5xGK4h2g"
         headers = {
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {api_token}'
         }
         
         try:
