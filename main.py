@@ -1733,38 +1733,7 @@ class Main(Star):
             logger.error(f"搜图时发生错误：{e}")
             return CommandResult().error(f"搜图失败：{str(e)}")
 
-    @filter.command("随机漫剪")
-    async def random_anime_clip(self, message: AstrMessageEvent):
-        """随机漫剪功能"""
-        # API配置
-        api_url = "http://api.xiaomei520.sbs/api/随机漫剪/?"
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(api_url) as resp:
-                    if resp.status != 200:
-                        return CommandResult().error(f"获取随机漫剪失败：服务器错误 (HTTP {resp.status})")
-                    
-                    # 直接读取视频数据
-                    video_data = await resp.read()
-                    
-                    # 保存视频到本地
-                    try:
-                        with open("random_anime_clip.mp4", "wb") as f:
-                            f.write(video_data)
-                        return CommandResult(chain=[Video.fromFileSystem(path="random_anime_clip.mp4")])
-                    except Exception as e:
-                        return CommandResult().error(f"保存视频失败: {e}")
-                        
-        except aiohttp.ClientError as e:
-            logger.error(f"网络连接错误：{e}")
-            return CommandResult().error("无法连接到随机漫剪服务器，请稍后重试或检查网络连接")
-        except asyncio.TimeoutError:
-            logger.error("请求超时")
-            return CommandResult().error("获取随机漫剪超时，请稍后重试")
-        except Exception as e:
-            logger.error(f"获取随机漫剪时发生错误：{e}")
-            return CommandResult().error(f"获取随机漫剪失败：{str(e)}")
+
 
     @filter.command("葫芦侠软件搜索")
     async def huluxia_software_search(self, message: AstrMessageEvent):
@@ -1908,7 +1877,7 @@ class Main(Star):
                     # 构建输出文本
                     output = f"查询内容: {content}\n\n内容修改时间：{cache_time}"
                     
-                    # 如果有图片，直接发送图片
+                    # 如果有图片，同时发送文本和图片
                     if img_url and img_url.startswith("http"):
                         try:
                             # 下载图片
@@ -1918,7 +1887,8 @@ class Main(Star):
                                     # 保存图片到本地
                                     with open("dont_starve_image.jpg", "wb") as f:
                                         f.write(image_data)
-                                    return CommandResult().file_image("dont_starve_image.jpg")
+                                    # 同时发送文本和图片
+                                    return CommandResult(chain=[Plain(output), Image("dont_starve_image.jpg")])
                                 else:
                                     # 如果图片下载失败，返回文本信息
                                     return CommandResult(chain=[Plain(output)])
@@ -1939,3 +1909,199 @@ class Main(Star):
         except Exception as e:
             logger.error(f"饥荒查询时发生错误：{e}")
             return CommandResult().error(f"饥荒查询失败：{str(e)}")
+
+    @filter.command("我的世界查询")
+    async def minecraft_query(self, message: AstrMessageEvent):
+        """我的世界查询功能"""
+        # 获取用户输入
+        user_input = message.message_str.replace("我的世界查询", "").strip()
+        
+        # 如果没有输入任何内容
+        if not user_input:
+            return CommandResult().error("正确指令：我的世界查询 物品")
+        
+        # 构建api请求url
+        api_url = "https://api.tangdouz.com/mcwiki.php"
+        params = {
+            "nr": user_input,
+            "return": "json"
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error(f"我的世界查询失败：服务器错误 (HTTP {resp.status})")
+                    
+                    # 解析json响应
+                    try:
+                        data = await resp.json()
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON解析错误：{e}")
+                        return CommandResult().error("我的世界查询失败：服务器返回了无效的JSON格式")
+                    
+                    # 获取查询内容
+                    allcontent = data.get("allcontent", "")
+                    img_url = data.get("img", "")
+                    
+                    # 构建输出文本
+                    output = f"查询内容: {allcontent}"
+                    
+                    # 如果有图片，同时发送文本和图片
+                    if img_url and img_url.startswith("http"):
+                        try:
+                            # 下载图片
+                            async with session.get(img_url) as img_resp:
+                                if img_resp.status == 200:
+                                    image_data = await img_resp.read()
+                                    # 保存图片到本地
+                                    with open("minecraft_image.jpg", "wb") as f:
+                                        f.write(image_data)
+                                    # 同时发送文本和图片
+                                    return CommandResult(chain=[Plain(output), Image("minecraft_image.jpg")])
+                                else:
+                                    # 如果图片下载失败，返回文本信息
+                                    return CommandResult(chain=[Plain(output)])
+                        except Exception as e:
+                            logger.error(f"下载图片失败：{e}")
+                            # 如果图片下载失败，返回文本信息
+                            return CommandResult(chain=[Plain(output)])
+                    else:
+                        # 如果没有图片，返回文本信息
+                        return CommandResult(chain=[Plain(output)])
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到我的世界查询服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("我的世界查询超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"我的世界查询时发生错误：{e}")
+            return CommandResult().error(f"我的世界查询失败：{str(e)}")
+
+    @filter.command("好游快爆热搜榜")
+    async def haoyou_hot_search(self, message: AstrMessageEvent):
+        """好游快爆热搜榜功能"""
+        # API配置
+        api_url = "https://wwm.34bc.com/API/Haoyou_Quick_Hot_Search.php"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error(f"获取好游快爆热搜榜失败：服务器错误 (HTTP {resp.status})")
+                    
+                    # 获取响应文本
+                    result = await resp.text()
+                    
+                    # 检查是否包含有效数据
+                    if "----好游快爆热搜榜----" not in result:
+                        return CommandResult().error("获取好游快爆热搜榜失败：服务器返回了无效数据")
+                    
+                    # 直接返回API返回的格式化结果
+                    return CommandResult().message(result)
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到好游快爆热搜榜服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("获取好游快爆热搜榜超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"获取好游快爆热搜榜时发生错误：{e}")
+            return CommandResult().error(f"获取好游快爆热搜榜失败：{str(e)}")
+
+    @filter.command("AI绘画")
+    async def ai_image_generation(self, message: AstrMessageEvent):
+        """AI绘画功能"""
+        # 获取用户输入
+        user_input = message.message_str.replace("AI绘画", "").strip()
+        
+        # 如果没有输入任何内容
+        if not user_input:
+            return CommandResult().error("正确指令：/AI绘画 图像描述（必填） 图像宽度（不必填） 图像高度（不必要） 提示词增强(是/不)（不必填） 模型（flux(默认)/kontext/turbo）（不必填） 种子(固定种子可重现相同图像)")
+        
+        # 分割输入参数
+        parts = user_input.split()
+        
+        # 至少需要图像描述
+        if len(parts) < 1:
+            return CommandResult().error("正确指令：/AI绘画 图像描述（必填） 图像宽度（不必填） 图像高度（不必要） 提示词增强(是/不)（不必填） 模型（flux(默认)/kontext/turbo）（不必填） 种子(固定种子可重现相同图像)")
+        
+        # 解析参数
+        description = parts[0]  # 图像描述（必填）
+        width = parts[1] if len(parts) > 1 else None  # 图像宽度
+        height = parts[2] if len(parts) > 2 else None  # 图像高度
+        enhance = parts[3] if len(parts) > 3 else None  # 提示词增强
+        model = parts[4] if len(parts) > 4 else None  # 模型
+        seed = parts[5] if len(parts) > 5 else None  # 种子
+        
+        # 构建API请求参数
+        params = {"description": description}
+        
+        # 添加可选参数
+        if width:
+            try:
+                # 验证宽度是否为数字
+                int(width)
+                params["width"] = width
+            except ValueError:
+                return CommandResult().error("图像宽度必须是数字")
+        
+        if height:
+            try:
+                # 验证高度是否为数字
+                int(height)
+                params["height"] = height
+            except ValueError:
+                return CommandResult().error("图像高度必须是数字")
+        
+        if enhance:
+            if enhance in ["是", "true", "True"]:
+                params["enhance"] = "true"
+            elif enhance in ["不", "false", "False"]:
+                params["enhance"] = "false"
+            else:
+                return CommandResult().error("提示词增强参数必须是：是/不")
+        
+        if model:
+            if model in ["flux", "kontext", "turbo"]:
+                params["model"] = model
+            else:
+                return CommandResult().error("模型参数必须是：flux/kontext/turbo")
+        
+        if seed:
+            params["seed"] = seed
+        
+        # 构建API请求URL
+        api_url = "https://api.lvlong.xyz/api/ai_image"
+        
+        try:
+            # 设置超时时间：连接超时10秒，总超时120秒（AI绘画可能需要更长时间）
+            timeout = aiohttp.ClientTimeout(total=120, connect=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error(f"AI绘画失败：服务器错误 (HTTP {resp.status})")
+                    
+                    # 直接读取图片数据
+                    image_data = await resp.read()
+                    
+                    # 保存图片到本地
+                    try:
+                        with open("ai_generated_image.jpg", "wb") as f:
+                            f.write(image_data)
+                        return CommandResult().file_image("ai_generated_image.jpg")
+                    except Exception as e:
+                        return CommandResult().error(f"保存AI绘画图片失败: {e}")
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到AI绘画服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("AI绘画超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"AI绘画时发生错误：{e}")
+            return CommandResult().error(f"AI绘画失败：{str(e)}")
