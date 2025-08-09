@@ -312,6 +312,54 @@ class Main(Star):
 
         return CommandResult().message(result_text).use_t2i(False)
 
+    @filter.command("蔚蓝档案随机图片")
+    async def blue_archive_random_image(self, message: AstrMessageEvent):
+        """蔚蓝档案随机图片"""
+        message_str = message.message_str.replace("蔚蓝档案随机图片", "").strip()
+        
+        # 检查参数
+        if not message_str:
+            return CommandResult().error("正确指令：蔚蓝档案随机图片 横/竖/自适应")
+        
+        # 验证参数
+        valid_params = ["横", "竖", "自适应"]
+        if message_str not in valid_params:
+            return CommandResult().error("正确指令：蔚蓝档案随机图片 横/竖/自适应")
+        
+        # 映射参数到API参数
+        param_mapping = {
+            "横": "horizontal",
+            "竖": "vertical", 
+            "自适应": "adaptive"
+        }
+        
+        api_param = param_mapping[message_str]
+        url = f"https://rba.kanostar.top/adapt?type={api_param}"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error(f"获取图片失败: {resp.status}")
+                    
+                    # 检查响应类型是否为图片
+                    content_type = resp.headers.get('content-type', '')
+                    if not content_type.startswith('image/'):
+                        return CommandResult().error("API返回的不是图片数据")
+                    
+                    data = await resp.read()
+            
+            # 保存图片到本地
+            try:
+                with open("blue_archive_image.jpg", "wb") as f:
+                    f.write(data)
+                return CommandResult().file_image("blue_archive_image.jpg")
+            except Exception as e:
+                return CommandResult().error(f"保存图片失败: {e}")
+                
+        except Exception as e:
+            return CommandResult().error(f"请求失败: {e}")
+
     @filter.command("一言")
     async def hitokoto(self, message: AstrMessageEvent):
         """来一条一言"""
@@ -1658,8 +1706,13 @@ class Main(Star):
                         
                         messages.append(output)
                     
+                    # 构建消息链
+                    message_chain = []
+                    for output in messages:
+                        message_chain.append(Plain(output))
+                    
                     # 返回所有批次的消息
-                    return CommandResult().messages(messages)
+                    return CommandResult(chain=message_chain)
                         
         except aiohttp.ClientError as e:
             logger.error(f"网络连接错误：{e}")
