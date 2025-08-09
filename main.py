@@ -1329,7 +1329,7 @@ class Main(Star):
                     
                     # 构建输出结果
                     chain = MessageChain([
-                        f"明日方舟寻访模拟 - {pool_name}",
+                        Plain(f"明日方舟寻访模拟 - {pool_name}"),
                         image
                     ])
                     
