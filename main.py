@@ -1583,3 +1583,77 @@ class Main(Star):
         except Exception as e:
             logger.error(f"搜图时发生错误：{e}")
             return CommandResult().error(f"搜图失败：{str(e)}")
+
+    @filter.command("/我的世界版本列表")
+    async def minecraft_version_list(self, message: AstrMessageEvent):
+        """我的世界版本列表功能"""
+        api_url = "https://mcapks.net/api/get-vslist.php"
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url) as resp:
+                    if resp.status != 200:
+                        if resp.status == 400:
+                            return CommandResult().error("获取版本列表失败：请求参数无效 (HTTP 400)")
+                        elif resp.status == 404:
+                            return CommandResult().error("获取版本列表失败：指定版本不存在 (HTTP 404)")
+                        elif resp.status == 429:
+                            return CommandResult().error("获取版本列表失败：请求频率超限，请稍后重试 (HTTP 429)")
+                        elif resp.status == 500:
+                            return CommandResult().error("获取版本列表失败：服务器内部错误 (HTTP 500)")
+                        else:
+                            return CommandResult().error(f"获取版本列表失败：服务器错误 (HTTP {resp.status})")
+                    
+                    # 解析JSON响应
+                    try:
+                        data = await resp.json()
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON解析错误：{e}")
+                        return CommandResult().error("获取版本列表失败：服务器返回了无效的JSON格式")
+                    
+                    # 检查API响应
+                    if not data.get("success"):
+                        msg = data.get("message", "未知错误")
+                        return CommandResult().error(f"获取版本列表失败：{msg}")
+                    
+                    # 获取版本数据
+                    if "data" not in data or "versions" not in data["data"]:
+                        return CommandResult().error("获取版本列表失败：未获取到版本数据")
+                    
+                    version_data = data["data"]
+                    total = version_data.get("total", 0)
+                    versions = version_data.get("versions", [])
+                    
+                    # 构建输出结果
+                    output = "是否成功：是\n"
+                    output += f"总数：{total}\n"
+                    output += "版本列表：\n\n"
+                    
+                    # 遍历所有版本
+                    for version in versions:
+                        version_num = version.get("version", "未知")
+                        is_beta = "是" if version.get("beta", False) else "否"
+                        date_str = version.get("date", "未知")
+                        size_str = version.get("size", "未知")
+                        
+                        # 格式化日期
+                        if date_str != "未知" and "-" in date_str:
+                            year, month, day = date_str.split("-")
+                            date_str = f"{year} 年 {int(month)} 月 {int(day)} 日"
+                        
+                        output += f"版本号: {version_num}\n"
+                        output += f"是否为测试版: {is_beta}\n"
+                        output += f"发布日期: {date_str}\n"
+                        output += f"大小: {size_str}\n\n"
+                    
+                    return CommandResult().message(output)
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到我的世界API服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("获取版本列表超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"获取版本列表时发生错误：{e}")
+            return CommandResult().error(f"获取版本列表失败：{str(e)}")
