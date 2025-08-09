@@ -1284,60 +1284,61 @@ class Main(Star):
             logger.error(f"查询原神深渊数据时发生错误：{e}")
             return CommandResult().error("查询失败！可能是服务器问题！\n提醒：用户必须注册米游社/HoYoLAB，且开启了\"在战绩页面是否展示角色战绩\"否则也会查询失败！！！")
 
-    @filter.command("/识图")
-    async def ai_image_recognition(self, message: AstrMessageEvent):
-        """AI识图功能"""
-        # 获取消息对象
-        message_obj = message.message_obj
+    @filter.command("方舟寻访")
+    async def arknights_recruitment(self, message: AstrMessageEvent):
+        """明日方舟寻访模拟"""
+        # 解析参数：方舟寻访 卡池选择（选填）
+        msg = message.message_str.replace("方舟寻访", "").strip()
         
-        # 查找图片对象
-        image_obj = None
-        for i in message_obj.message:
-            if isinstance(i, Image):
-                image_obj = i
-                break
+        # 卡池映射
+        pool_mapping = {
+            "1": "不归花火",
+            "2": "指令·重构", 
+            "3": "自火中归还",
+            "4": "她们渡船而来"
+        }
         
-        # 如果没有找到图片，返回错误信息
-        if not image_obj:
-            return CommandResult().error("正确指令：/识图 你发的图片")
+        # 默认使用最新卡池（1）
+        pool = "1"
+        pool_name = "不归花火"
+        
+        # 如果用户提供了卡池参数
+        if msg:
+            if msg in pool_mapping:
+                pool = msg
+                pool_name = pool_mapping[msg]
+            else:
+                return CommandResult().error("正确指令：方舟寻访 卡池选择\n卡池有：1：不归花火，2：指令·重构，3：自火中归还，4：她们渡船而来。不填卡池则默认最新卡池")
         
         # API配置
-        api_url = "https://api.pearktrue.cn/api/airecognizeimg/"
+        api_url = f"https://app.zichen.zone/api/headhunts/api.php?type=img&pool={pool}"
         
         try:
-            # 设置超时
-            timeout = aiohttp.ClientTimeout(total=30)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                # 准备请求数据
-                payload = {
-                    "file": image_obj.url
-                }
-                
-                async with session.post(api_url, json=payload) as resp:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url) as resp:
                     if resp.status != 200:
-                        return CommandResult().error("识图失败：服务器错误")
+                        return CommandResult().error("寻访失败：服务器错误")
                     
-                    data = await resp.json()
+                    # 获取图片数据
+                    image_data = await resp.read()
                     
-                    # 检查API响应
-                    if data.get("code") != 200:
-                        msg = data.get("msg", "未知错误")
-                        return CommandResult().error(f"识图失败：{msg}")
+                    # 创建图片消息
+                    image = Image(image_data)
                     
                     # 构建输出结果
-                    output = "状态信息：\n"
-                    output += f"{data.get('msg', '')}\n\n"
-                    output += "识别结果：\n"
-                    output += f"{data.get('result', '')}"
+                    chain = MessageChain([
+                        f"明日方舟寻访模拟 - {pool_name}",
+                        image
+                    ])
                     
-                    return CommandResult().message(output)
+                    return CommandResult().message(chain)
                         
         except aiohttp.ClientError as e:
             logger.error(f"网络连接错误：{e}")
-            return CommandResult().error("无法连接到识图服务器，请稍后重试或检查网络连接")
+            return CommandResult().error("无法连接到寻访服务器，请稍后重试或检查网络连接")
         except asyncio.TimeoutError:
             logger.error("请求超时")
-            return CommandResult().error("识图超时，请稍后重试")
+            return CommandResult().error("寻访超时，请稍后重试")
         except Exception as e:
-            logger.error(f"AI识图时发生错误：{e}")
-            return CommandResult().error(f"识图失败：{str(e)}")
+            logger.error(f"明日方舟寻访时发生错误：{e}")
+            return CommandResult().error(f"寻访失败：{str(e)}")
