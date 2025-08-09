@@ -1584,7 +1584,7 @@ class Main(Star):
             logger.error(f"搜图时发生错误：{e}")
             return CommandResult().error(f"搜图失败：{str(e)}")
 
-    @filter.command("/我的世界版本列表")
+    @filter.command("我的世界版本列表")
     async def minecraft_version_list(self, message: AstrMessageEvent):
         """我的世界版本列表功能"""
         api_url = "https://mcapks.net/api/get-vslist.php"
