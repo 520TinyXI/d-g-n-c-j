@@ -1624,29 +1624,42 @@ class Main(Star):
                     total = version_data.get("total", 0)
                     versions = version_data.get("versions", [])
                     
-                    # 构建输出结果
-                    output = "是否成功：是\n"
-                    output += f"总数：{total}\n"
-                    output += "版本列表：\n\n"
+                    # 分批次输出，每次30个版本
+                    batch_size = 30
+                    messages = []
                     
-                    # 遍历所有版本
-                    for version in versions:
-                        version_num = version.get("version", "未知")
-                        is_beta = "是" if version.get("beta", False) else "否"
-                        date_str = version.get("date", "未知")
-                        size_str = version.get("size", "未知")
+                    # 分批处理版本数据
+                    for i in range(0, len(versions), batch_size):
+                        batch_versions = versions[i:i + batch_size]
+                        current_count = len(batch_versions)
                         
-                        # 格式化日期
-                        if date_str != "未知" and "-" in date_str:
-                            year, month, day = date_str.split("-")
-                            date_str = f"{year} 年 {int(month)} 月 {int(day)} 日"
+                        # 构建每批次的输出结果
+                        output = "是否成功：是\n"
+                        output += f"总数：{total}\n"
+                        output += f"当前显示数：{current_count}\n"
+                        output += "版本列表：\n\n"
                         
-                        output += f"版本号: {version_num}\n"
-                        output += f"是否为测试版: {is_beta}\n"
-                        output += f"发布日期: {date_str}\n"
-                        output += f"大小: {size_str}\n\n"
+                        # 遍历当前批次的版本
+                        for version in batch_versions:
+                            version_num = version.get("version", "未知")
+                            is_beta = "是" if version.get("beta", False) else "否"
+                            date_str = version.get("date", "未知")
+                            size_str = version.get("size", "未知")
+                            
+                            # 格式化日期
+                            if date_str != "未知" and "-" in date_str:
+                                year, month, day = date_str.split("-")
+                                date_str = f"{year} 年 {int(month)} 月 {int(day)} 日"
+                            
+                            output += f"版本号: {version_num}\n"
+                            output += f"是否为测试版: {is_beta}\n"
+                            output += f"发布日期: {date_str}\n"
+                            output += f"大小: {size_str}\n\n"
+                        
+                        messages.append(output)
                     
-                    return CommandResult().message(output)
+                    # 返回所有批次的消息
+                    return CommandResult().messages(messages)
                         
         except aiohttp.ClientError as e:
             logger.error(f"网络连接错误：{e}")
