@@ -1405,6 +1405,61 @@ class Main(Star):
             logger.error(f"AI识图时发生错误：{e}")
             return CommandResult().error(f"识图失败：{str(e)}")
 
+    @filter.command("方舟寻访")
+    async def arknights_recruitment(self, message: AstrMessageEvent):
+        """明日方舟寻访模拟功能"""
+        msg = message.message_str.replace("方舟寻访", "").strip()
+        
+        # 卡池映射
+        pool_map = {
+            "1": "不归花火",
+            "2": "指令·重构", 
+            "3": "自火中归还",
+            "4": "她们渡船而来"
+        }
+        
+        # 默认卡池为1
+        pool = "1"
+        if msg:
+            if msg in pool_map:
+                pool = msg
+            else:
+                return CommandResult().error(f"卡池选择错误，可选：\n1：不归花火\n2：指令·重构\n3：自火中归还\n4：她们渡船而来")
+        
+        # API配置 - 直接获取图片
+        api_url = "https://app.zichen.zone/api/headhunts/api.php"
+        params = {
+            "type": "img",
+            "pool": pool
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error(f"方舟寻访失败：服务器错误 (HTTP {resp.status})")
+                    
+                    # 直接读取图片数据
+                    image_data = await resp.read()
+                    
+                    # 保存图片到本地
+                    try:
+                        with open("arknights_recruitment.jpg", "wb") as f:
+                            f.write(image_data)
+                        return CommandResult().file_image("arknights_recruitment.jpg")
+                    except Exception as e:
+                        return CommandResult().error(f"保存图片失败: {e}")
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到方舟寻访服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("方舟寻访超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"方舟寻访时发生错误：{e}")
+            return CommandResult().error(f"方舟寻访失败：{str(e)}")
+
     @filter.command("黑白图制作")
     async def black_white_image(self, message: AstrMessageEvent):
         """黑白图片制作功能"""
@@ -1429,50 +1484,21 @@ class Main(Star):
         }
         
         try:
-            # 设置超时
-            timeout = aiohttp.ClientTimeout(total=30)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with aiohttp.ClientSession() as session:
                 async with session.get(api_url, params=params) as resp:
                     if resp.status != 200:
-                        logger.error(f"HTTP错误状态码：{resp.status}")
                         return CommandResult().error(f"黑白图制作失败：服务器错误 (HTTP {resp.status})")
                     
-                    # 检查响应头的内容类型
-                    content_type = resp.headers.get('content-type', '').lower()
-                    if 'application/json' not in content_type:
-                        logger.error(f"意外的内容类型：{content_type}")
-                        # 如果不是JSON，可能是图片直接返回
-                        if 'image/' in content_type:
-                            # 直接返回图片数据
-                            image_data = await resp.read()
-                            import base64
-                            image_base64 = base64.b64encode(image_data).decode('utf-8')
-                            return CommandResult().file_image(f"data:{content_type};base64,{image_base64}")
-                    
-                    # 先获取响应文本，检查是否为空
-                    response_text = await resp.text()
-                    if not response_text.strip():
-                        return CommandResult().error("黑白图制作失败：服务器返回空响应")
-                    
-                    # 记录原始响应以便调试
-                    logger.info(f"黑白图API原始响应：{response_text[:200]}...")
-                    
-                    # 解析JSON
+                    # 解析JSON响应
                     try:
-                        data = json.loads(response_text)
+                        data = await resp.json()
                     except json.JSONDecodeError as e:
-                        logger.error(f"JSON解析错误：{e}, 响应内容：{response_text}")
-                        # 检查是否是HTML错误页面
-                        if response_text.strip().startswith('<'):
-                            return CommandResult().error("黑白图制作失败：服务器返回了HTML错误页面，可能是服务暂时不可用")
+                        logger.error(f"JSON解析错误：{e}")
                         return CommandResult().error("黑白图制作失败：服务器返回了无效的JSON格式")
                     
                     # 检查API响应
                     if data.get("code") != 200:
                         msg = data.get("msg", "未知错误")
-                        text = data.get("text", "")
-                        if text:
-                            return CommandResult().error(f"黑白图制作失败：{msg} - {text}")
                         return CommandResult().error(f"黑白图制作失败：{msg}")
                     
                     # 获取处理后的图片URL
@@ -1480,8 +1506,23 @@ class Main(Star):
                     if not result_url:
                         return CommandResult().error("黑白图制作失败：未获取到处理后的图片URL")
                     
-                    # 直接返回处理后的图片
-                    return CommandResult().file_image(result_url)
+                    # 下载处理后的图片
+                    try:
+                        async with session.get(result_url) as img_resp:
+                            if img_resp.status != 200:
+                                return CommandResult().error(f"下载处理后的图片失败：HTTP {img_resp.status}")
+                            
+                            # 读取图片数据
+                            image_data = await img_resp.read()
+                            
+                            # 保存图片到本地
+                            with open("black_white_image.jpg", "wb") as f:
+                                f.write(image_data)
+                            
+                            return CommandResult().file_image("black_white_image.jpg")
+                    
+                    except Exception as e:
+                        return CommandResult().error(f"下载或保存图片失败: {e}")
                         
         except aiohttp.ClientError as e:
             logger.error(f"网络连接错误：{e}")
@@ -1489,9 +1530,6 @@ class Main(Star):
         except asyncio.TimeoutError:
             logger.error("请求超时")
             return CommandResult().error("黑白图制作超时，请稍后重试")
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON解析错误：{e}")
-            return CommandResult().error("黑白图制作失败：服务器响应格式错误")
         except Exception as e:
             logger.error(f"黑白图制作时发生错误：{e}")
             return CommandResult().error(f"黑白图制作失败：{str(e)}")
