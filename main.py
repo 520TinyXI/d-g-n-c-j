@@ -1733,39 +1733,7 @@ class Main(Star):
             logger.error(f"搜图时发生错误：{e}")
             return CommandResult().error(f"搜图失败：{str(e)}")
 
-    @filter.command("随机漫剪")
-    async def random_anime_clip(self, message: AstrMessageEvent):
-        """随机漫剪功能"""
-        # API配置
-        api_url = "http://api.xiaomei520.sbs/api/随机漫剪/?"
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(api_url) as resp:
-                    if resp.status != 200:
-                        yield message.chain_result([Plain(f"获取随机漫剪失败：服务器错误 (HTTP {resp.status})")])
-                        return
-                    
-                    # 直接读取视频数据
-                    video_data = await resp.read()
-                    
-                    # 保存视频到本地
-                    try:
-                        with open("random_anime_clip.mp4", "wb") as f:
-                            f.write(video_data)
-                        yield message.chain_result([Video.fromFileSystem(path="random_anime_clip.mp4")])
-                    except Exception as e:
-                        yield message.chain_result([Plain(f"保存视频失败: {e}")])
-                        
-        except aiohttp.ClientError as e:
-            logger.error(f"网络连接错误：{e}")
-            yield message.chain_result([Plain("无法连接到随机漫剪服务器，请稍后重试或检查网络连接")])
-        except asyncio.TimeoutError:
-            logger.error("请求超时")
-            yield message.chain_result([Plain("获取随机漫剪超时，请稍后重试")])
-        except Exception as e:
-            logger.error(f"获取随机漫剪时发生错误：{e}")
-            yield message.chain_result([Plain(f"获取随机漫剪失败：{str(e)}")])
+
 
     @filter.command("葫芦侠软件搜索")
     async def huluxia_software_search(self, message: AstrMessageEvent):
@@ -1870,3 +1838,105 @@ class Main(Star):
         # 如果输入格式错误
         else:
             return CommandResult().error("正确指令：葫芦侠软件搜索 软件名 下载序号链接")
+
+    @filter.command("AI绘画")
+    async def ai_image_generation(self, message: AstrMessageEvent):
+        """AI绘画功能"""
+        # 获取用户输入
+        user_input = message.message_str.replace("AI绘画", "").strip()
+        
+        # 如果没有输入任何内容
+        if not user_input:
+            return CommandResult().error("正确指令：AI绘画 图像描述 [宽度] [高度] [提示词增强] [模型] [种子]")
+        
+        # 分割输入内容
+        parts = user_input.split()
+        
+        # 至少需要图像描述
+        if len(parts) < 1:
+            return CommandResult().error("正确指令：AI绘画 图像描述 [宽度] [高度] [提示词增强] [模型] [种子]")
+        
+        # 解析参数
+        description = parts[0]  # 图像描述（必填）
+        width = None
+        height = None
+        enhance = None
+        model = None
+        seed = None
+        
+        # 解析可选参数
+        if len(parts) > 1:
+            try:
+                width = int(parts[1])
+                if width <= 0:
+                    return CommandResult().error("图像宽度必须大于0")
+            except ValueError:
+                return CommandResult().error("图像宽度必须是数字")
+        
+        if len(parts) > 2:
+            try:
+                height = int(parts[2])
+                if height <= 0:
+                    return CommandResult().error("图像高度必须大于0")
+            except ValueError:
+                return CommandResult().error("图像高度必须是数字")
+        
+        if len(parts) > 3:
+            enhance = parts[3]
+            if enhance not in ["是", "不", "true", "false"]:
+                return CommandResult().error("提示词增强必须是'是'、'不'、'true'或'false'")
+        
+        if len(parts) > 4:
+            model = parts[4]
+            if model not in ["flux", "kontext", "turbo"]:
+                return CommandResult().error("模型必须是'flux'、'kontext'或'turbo'")
+        
+        if len(parts) > 5:
+            try:
+                seed = int(parts[5])
+                if seed < 0:
+                    return CommandResult().error("种子必须是非负整数")
+            except ValueError:
+                return CommandResult().error("种子必须是整数")
+        
+        # 构建API请求参数
+        api_url = "https://api.lvlong.xyz/api/ai_image"
+        params = {"description": description}
+        
+        if width is not None:
+            params["width"] = width
+        if height is not None:
+            params["height"] = height
+        if enhance is not None:
+            params["enhance"] = enhance
+        if model is not None:
+            params["model"] = model
+        if seed is not None:
+            params["seed"] = seed
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error(f"AI绘画失败：服务器错误 (HTTP {resp.status})")
+                    
+                    # 直接读取图片数据
+                    image_data = await resp.read()
+                    
+                    # 保存图片到本地
+                    try:
+                        with open("ai_generated_image.jpg", "wb") as f:
+                            f.write(image_data)
+                        return CommandResult().file_image("ai_generated_image.jpg")
+                    except Exception as e:
+                        return CommandResult().error(f"保存图片失败: {e}")
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到AI绘画服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("AI绘画超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"AI绘画时发生错误：{e}")
+            return CommandResult().error(f"AI绘画失败：{str(e)}")
