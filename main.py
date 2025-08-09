@@ -807,7 +807,9 @@ class Main(Star):
         api_url = "https://api.pearktrue.cn/api/brainteasers/"
         
         try:
-            async with aiohttp.ClientSession() as session:
+            # 设置超时
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(api_url) as resp:
                     if resp.status != 200:
                         return CommandResult().error("获取脑筋急转弯失败")
@@ -1487,16 +1489,31 @@ class Main(Star):
         }
         
         try:
-            async with aiohttp.ClientSession() as session:
+            # 设置超时
+            timeout = aiohttp.ClientTimeout(total=30)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(api_url, params=params) as resp:
                     if resp.status != 200:
                         return CommandResult().error("黑白图制作失败：服务器错误")
                     
-                    data = await resp.json()
+                    # 先获取响应文本，检查是否为空
+                    response_text = await resp.text()
+                    if not response_text.strip():
+                        return CommandResult().error("黑白图制作失败：服务器返回空响应")
+                    
+                    # 解析JSON
+                    try:
+                        data = json.loads(response_text)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON解析错误：{e}, 响应内容：{response_text}")
+                        return CommandResult().error("黑白图制作失败：服务器返回了无效的JSON格式")
                     
                     # 检查API响应
                     if data.get("code") != 200:
                         msg = data.get("msg", "未知错误")
+                        text = data.get("text", "")
+                        if text:
+                            return CommandResult().error(f"黑白图制作失败：{msg} - {text}")
                         return CommandResult().error(f"黑白图制作失败：{msg}")
                     
                     # 获取处理后的图片URL
