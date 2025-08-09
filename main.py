@@ -1460,76 +1460,126 @@ class Main(Star):
             logger.error(f"方舟寻访时发生错误：{e}")
             return CommandResult().error(f"方舟寻访失败：{str(e)}")
 
-    @filter.command("黑白图制作")
-    async def black_white_image(self, message: AstrMessageEvent):
-        """黑白图片制作功能"""
-        # 获取消息对象
-        message_obj = message.message_obj
-        
-        # 查找图片对象
-        image_obj = None
-        for i in message_obj.message:
-            if isinstance(i, Image):
-                image_obj = i
-                break
-        
-        # 如果没有找到图片，返回错误信息
-        if not image_obj:
-            return CommandResult().error("正确指令：黑白图制作 图片")
-        
-        # API配置
-        api_url = "https://api.52vmy.cn/api/img/heibai"
-        params = {
-            "url": image_obj.url
-        }
+    @filter.command("/随机游戏图片")
+    async def get_random_game_image(self, message: AstrMessageEvent):
+        """随机游戏图片"""
+        api_url = "https://api.52vmy.cn/api/img/tu/game"
         
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(api_url, params=params) as resp:
+                async with session.get(api_url) as resp:
                     if resp.status != 200:
-                        return CommandResult().error(f"黑白图制作失败：服务器错误 (HTTP {resp.status})")
+                        return CommandResult().error(f"获取游戏图片失败: {resp.status}")
                     
                     # 解析JSON响应
                     try:
                         data = await resp.json()
                     except json.JSONDecodeError as e:
                         logger.error(f"JSON解析错误：{e}")
-                        return CommandResult().error("黑白图制作失败：服务器返回了无效的JSON格式")
+                        return CommandResult().error("获取游戏图片失败：服务器返回了无效的JSON格式")
                     
                     # 检查API响应
                     if data.get("code") != 200:
                         msg = data.get("msg", "未知错误")
-                        return CommandResult().error(f"黑白图制作失败：{msg}")
+                        return CommandResult().error(f"获取游戏图片失败：{msg}")
                     
-                    # 获取处理后的图片URL
-                    result_url = data.get("url")
-                    if not result_url:
-                        return CommandResult().error("黑白图制作失败：未获取到处理后的图片URL")
+                    # 获取图片URL
+                    image_url = data.get("url")
+                    if not image_url:
+                        return CommandResult().error("获取游戏图片失败：未获取到图片URL")
                     
-                    # 下载处理后的图片
+                    # 下载图片
                     try:
-                        async with session.get(result_url) as img_resp:
+                        async with session.get(image_url) as img_resp:
                             if img_resp.status != 200:
-                                return CommandResult().error(f"下载处理后的图片失败：HTTP {img_resp.status}")
+                                return CommandResult().error(f"下载图片失败：HTTP {img_resp.status}")
                             
                             # 读取图片数据
                             image_data = await img_resp.read()
                             
                             # 保存图片到本地
-                            with open("black_white_image.jpg", "wb") as f:
+                            with open("random_game_image.jpg", "wb") as f:
                                 f.write(image_data)
                             
-                            return CommandResult().file_image("black_white_image.jpg")
+                            return CommandResult().file_image("random_game_image.jpg")
                     
                     except Exception as e:
                         return CommandResult().error(f"下载或保存图片失败: {e}")
                         
         except aiohttp.ClientError as e:
             logger.error(f"网络连接错误：{e}")
-            return CommandResult().error("无法连接到黑白图制作服务器，请稍后重试或检查网络连接")
+            return CommandResult().error("无法连接到游戏图片服务器，请稍后重试或检查网络连接")
         except asyncio.TimeoutError:
             logger.error("请求超时")
-            return CommandResult().error("黑白图制作超时，请稍后重试")
+            return CommandResult().error("获取游戏图片超时，请稍后重试")
         except Exception as e:
-            logger.error(f"黑白图制作时发生错误：{e}")
-            return CommandResult().error(f"黑白图制作失败：{str(e)}")
+            logger.error(f"获取游戏图片时发生错误：{e}")
+            return CommandResult().error(f"获取游戏图片失败：{str(e)}")
+
+    @filter.command("/搜图")
+    async def search_360_image(self, message: AstrMessageEvent):
+        """360搜图功能"""
+        # 获取关键词
+        keyword = message.message_str.replace("/搜图", "").strip()
+        
+        # 如果没有提供关键词，返回错误信息
+        if not keyword:
+            return CommandResult().error("正确指令：搜图 关键词")
+        
+        # API配置
+        api_url = "https://api.52vmy.cn/api/img/360"
+        params = {
+            "msg": keyword
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(api_url, params=params) as resp:
+                    if resp.status != 200:
+                        return CommandResult().error(f"搜图失败：服务器错误 (HTTP {resp.status})")
+                    
+                    # 解析JSON响应
+                    try:
+                        data = await resp.json()
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON解析错误：{e}")
+                        return CommandResult().error("搜图失败：服务器返回了无效的JSON格式")
+                    
+                    # 检查API响应
+                    if data.get("code") != 200:
+                        msg = data.get("msg", "未知错误")
+                        return CommandResult().error(f"搜图失败：{msg}")
+                    
+                    # 获取图片URL
+                    if "data" not in data or "url" not in data["data"]:
+                        return CommandResult().error("搜图失败：未获取到图片URL")
+                    
+                    image_url = data["data"]["url"]
+                    
+                    # 下载图片
+                    try:
+                        async with session.get(image_url) as img_resp:
+                            if img_resp.status != 200:
+                                return CommandResult().error(f"下载图片失败：HTTP {img_resp.status}")
+                            
+                            # 读取图片数据
+                            image_data = await img_resp.read()
+                            
+                            # 保存图片到本地
+                            with open("360_search_image.jpg", "wb") as f:
+                                f.write(image_data)
+                            
+                            return CommandResult().file_image("360_search_image.jpg")
+                    
+                    except Exception as e:
+                        return CommandResult().error(f"下载或保存图片失败: {e}")
+                        
+        except aiohttp.ClientError as e:
+            logger.error(f"网络连接错误：{e}")
+            return CommandResult().error("无法连接到搜图服务器，请稍后重试或检查网络连接")
+        except asyncio.TimeoutError:
+            logger.error("请求超时")
+            return CommandResult().error("搜图超时，请稍后重试")
+        except Exception as e:
+            logger.error(f"搜图时发生错误：{e}")
+            return CommandResult().error(f"搜图失败：{str(e)}")
