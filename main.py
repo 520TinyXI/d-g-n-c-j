@@ -9,7 +9,7 @@ import logging
 from PIL import Image as PILImage
 from PIL import ImageDraw as PILImageDraw
 from PIL import ImageFont as PILImageFont
-from astrbot.api.all import AstrMessageEvent, CommandResult, Context, Image, Plain
+from astrbot.api.all import AstrMessageEvent, CommandResult, Context, Image, Plain, MessageChain
 import astrbot.api.event.filter as filter
 from astrbot.api.star import register, Star
 
