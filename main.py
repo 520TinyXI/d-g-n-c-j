@@ -808,7 +808,7 @@ class Main(Star):
         
         try:
             # 设置超时
-            timeout = aiohttp.ClientTimeout(total=30)
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(api_url) as resp:
                     if resp.status != 200:
@@ -1286,67 +1286,7 @@ class Main(Star):
             logger.error(f"查询原神深渊数据时发生错误：{e}")
             return CommandResult().error("查询失败！可能是服务器问题！\n提醒：用户必须注册米游社/HoYoLAB，且开启了\"在战绩页面是否展示角色战绩\"否则也会查询失败！！！")
 
-    @filter.command("方舟寻访")
-    async def arknights_recruitment(self, message: AstrMessageEvent):
-        """明日方舟寻访模拟"""
-        # 解析参数：方舟寻访 卡池选择（选填）
-        msg = message.message_str.replace("方舟寻访", "").strip()
-        
-        # 卡池映射
-        pool_mapping = {
-            "1": "不归花火",
-            "2": "指令·重构", 
-            "3": "自火中归还",
-            "4": "她们渡船而来"
-        }
-        
-        # 默认使用最新卡池（1）
-        pool = "1"
-        pool_name = "不归花火"
-        
-        # 如果用户提供了卡池参数
-        if msg:
-            if msg in pool_mapping:
-                pool = msg
-                pool_name = pool_mapping[msg]
-            else:
-                return CommandResult().error("正确指令：方舟寻访 卡池选择\n卡池有：1：不归花火，2：指令·重构，3：自火中归还，4：她们渡船而来。不填卡池则默认最新卡池")
-        
-        # API配置
-        api_url = f"https://app.zichen.zone/api/headhunts/api.php?type=img&pool={pool}"
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(api_url) as resp:
-                    if resp.status != 200:
-                        return CommandResult().error("寻访失败：服务器错误")
-                    
-                    # 获取图片数据
-                    image_data = await resp.read()
-                    
-                    # 创建图片消息（使用base64编码）
-                    import base64
-                    image_base64 = base64.b64encode(image_data).decode('utf-8')
-                    image = Image(f"data:image/png;base64,{image_base64}")
-                    
-                    # 构建输出结果
-                    return CommandResult(
-                        chain=[
-                            Plain(f"明日方舟寻访模拟 - {pool_name}"),
-                            image
-                        ],
-                        use_t2i_=False
-                    )
-                        
-        except aiohttp.ClientError as e:
-            logger.error(f"网络连接错误：{e}")
-            return CommandResult().error("无法连接到寻访服务器，请稍后重试或检查网络连接")
-        except asyncio.TimeoutError:
-            logger.error("请求超时")
-            return CommandResult().error("寻访超时，请稍后重试")
-        except Exception as e:
-            logger.error(f"明日方舟寻访时发生错误：{e}")
-            return CommandResult().error(f"寻访失败：{str(e)}")
+
 
     @filter.command("123网盘解析")
     async def pan123_parse(self, message: AstrMessageEvent):
@@ -1494,18 +1434,37 @@ class Main(Star):
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(api_url, params=params) as resp:
                     if resp.status != 200:
-                        return CommandResult().error("黑白图制作失败：服务器错误")
+                        logger.error(f"HTTP错误状态码：{resp.status}")
+                        return CommandResult().error(f"黑白图制作失败：服务器错误 (HTTP {resp.status})")
+                    
+                    # 检查响应头的内容类型
+                    content_type = resp.headers.get('content-type', '').lower()
+                    if 'application/json' not in content_type:
+                        logger.error(f"意外的内容类型：{content_type}")
+                        # 如果不是JSON，可能是图片直接返回
+                        if 'image/' in content_type:
+                            # 直接返回图片数据
+                            image_data = await resp.read()
+                            import base64
+                            image_base64 = base64.b64encode(image_data).decode('utf-8')
+                            return CommandResult().file_image(f"data:{content_type};base64,{image_base64}")
                     
                     # 先获取响应文本，检查是否为空
                     response_text = await resp.text()
                     if not response_text.strip():
                         return CommandResult().error("黑白图制作失败：服务器返回空响应")
                     
+                    # 记录原始响应以便调试
+                    logger.info(f"黑白图API原始响应：{response_text[:200]}...")
+                    
                     # 解析JSON
                     try:
                         data = json.loads(response_text)
                     except json.JSONDecodeError as e:
                         logger.error(f"JSON解析错误：{e}, 响应内容：{response_text}")
+                        # 检查是否是HTML错误页面
+                        if response_text.strip().startswith('<'):
+                            return CommandResult().error("黑白图制作失败：服务器返回了HTML错误页面，可能是服务暂时不可用")
                         return CommandResult().error("黑白图制作失败：服务器返回了无效的JSON格式")
                     
                     # 检查API响应
@@ -1530,6 +1489,9 @@ class Main(Star):
         except asyncio.TimeoutError:
             logger.error("请求超时")
             return CommandResult().error("黑白图制作超时，请稍后重试")
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON解析错误：{e}")
+            return CommandResult().error("黑白图制作失败：服务器响应格式错误")
         except Exception as e:
             logger.error(f"黑白图制作时发生错误：{e}")
             return CommandResult().error(f"黑白图制作失败：{str(e)}")
