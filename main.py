@@ -1111,7 +1111,10 @@ class Main(Star):
         }
         
         try:
-            async with aiohttp.ClientSession() as session:
+            # 设置超时时间：连接超时10秒，总超时30秒
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                logger.info(f"开始我的世界查询请求，参数：{params}")
                 async with session.get(api_url, params=params) as resp:
                     if resp.status != 200:
                         return CommandResult().error("查询电影信息失败")
@@ -1932,11 +1935,14 @@ class Main(Star):
             async with aiohttp.ClientSession() as session:
                 async with session.get(api_url, params=params) as resp:
                     if resp.status != 200:
+                        error_text = await resp.text()
+                        logger.error(f"我的世界查询API返回错误状态码 {resp.status}，响应内容：{error_text}")
                         return CommandResult().error(f"我的世界查询失败：服务器错误 (HTTP {resp.status})")
                     
                     # 解析json响应
                     try:
                         data = await resp.json()
+                        logger.info(f"我的世界查询API响应成功，数据：{data}")
                     except json.JSONDecodeError as e:
                         logger.error(f"json解析错误：{e}")
                         return CommandResult().error("我的世界查询失败：服务器返回了无效的json格式")
