@@ -1936,9 +1936,9 @@ class Main(Star):
                     # 解析json响应
                     try:
                         data = await resp.json()
-                    except json.JSONDecodeError as e:
-                        logger.error(f"JSON解析错误：{e}")
-                        return CommandResult().error("我的世界查询失败：服务器返回了无效的JSON格式")
+                    except json.jsondecodeerror as e:
+                        logger.error(f"json解析错误：{e}")
+                        return commandresult().error("我的世界查询失败：服务器返回了无效的json格式")
                     
                     # 获取查询内容
                     allcontent = data.get("allcontent", "")
@@ -1999,8 +1999,16 @@ class Main(Star):
                     if "----好游快爆热搜榜----" not in result:
                         return CommandResult().error("获取好游快爆热搜榜失败：服务器返回了无效数据")
                     
-                    # 直接返回API返回的格式化结果
-                    return CommandResult().message(result)
+                    # 过滤掉PHP警告信息，只保留热搜榜内容
+                    # 查找热搜榜开始标记
+                    start_marker = "----好游快爆热搜榜----"
+                    start_index = result.find(start_marker)
+                    if start_index != -1:
+                        # 从开始标记处截取内容
+                        filtered_result = result[start_index:]
+                        return CommandResult().message(filtered_result)
+                    else:
+                        return CommandResult().error("获取好游快爆热搜榜失败：数据格式异常")
                         
         except aiohttp.ClientError as e:
             logger.error(f"网络连接错误：{e}")
@@ -2020,14 +2028,14 @@ class Main(Star):
         
         # 如果没有输入任何内容
         if not user_input:
-            return CommandResult().error("正确指令：/AI绘画 图像描述（必填） 图像宽度（不必填） 图像高度（不必要） 提示词增强(是/不)（不必填） 模型（flux(默认)/kontext/turbo）（不必填） 种子(固定种子可重现相同图像)")
+            return CommandResult().error("正确指令：AI绘画 图像描述（必填） [图像宽度] [图像高度] [提示词增强] [模型] [种子]\n\n参数说明：\n图像描述：必填，描述要生成的图像内容\n图像宽度：可选，数字，设置图像宽度\n图像高度：可选，数字，设置图像高度\n提示词增强：可选，true/false，增强提示词效果\n模型：可选，flux(默认)/kontext/turbo，选择绘画模型\n种子：可选，数字，固定种子可重现相同图像\n\n示例：AI绘画 一只狗 512 512 true flux 12345\n注意：如生成的图与描述严重不符，请使用英文提示词")
         
         # 分割输入参数
         parts = user_input.split()
         
         # 至少需要图像描述
         if len(parts) < 1:
-            return CommandResult().error("正确指令：/AI绘画 图像描述（必填） 图像宽度（不必填） 图像高度（不必要） 提示词增强(是/不)（不必填） 模型（flux(默认)/kontext/turbo）（不必填） 种子(固定种子可重现相同图像)")
+            return CommandResult().error("正确指令：AI绘画 图像描述（必填） [图像宽度] [图像高度] [提示词增强] [模型] [种子]\n\n参数说明：\n图像描述：必填，描述要生成的图像内容\n图像宽度：可选，数字，设置图像宽度\n图像高度：可选，数字，设置图像高度\n提示词增强：可选，true/false，增强提示词效果\n模型：可选，flux(默认)/kontext/turbo，选择绘画模型\n种子：可选，数字，固定种子可重现相同图像\n\n示例：AI绘画 一只狗 512 512 true flux 12345\n注意：如生成的图与描述严重不符，请使用英文提示词")
         
         # 解析参数
         description = parts[0]  # 图像描述（必填）
