@@ -1939,7 +1939,7 @@ class Main(Star):
                         data = await resp.json()
                     except json.JSONDecodeError as e:
                         logger.error(f"json解析错误：{e}")
-                        return commandresult().error("我的世界查询失败：服务器返回了无效的json格式")
+                        return CommandResult().error("我的世界查询失败：服务器返回了无效的json格式")
                     
                     # 获取查询内容
                     allcontent = data.get("allcontent", "")
@@ -2038,13 +2038,30 @@ class Main(Star):
         if len(parts) < 1:
             return CommandResult().error("正确指令：AI绘画 图像描述（必填） [图像宽度] [图像高度] [提示词增强] [模型] [种子]\n\n参数说明：\n图像描述：必填，描述要生成的图像内容\n图像宽度：可选，数字，设置图像宽度\n图像高度：可选，数字，设置图像高度\n提示词增强：可选，true/false，增强提示词效果\n模型：可选，flux(默认)/kontext/turbo，选择绘画模型\n种子：可选，数字，固定种子可重现相同图像\n\n示例：AI绘画 一只狗 512 512 true flux 12345\n注意：如生成的图与描述严重不符，请使用英文提示词")
         
-        # 解析参数
-        description = parts[0]  # 图像描述（必填）
-        width = parts[1] if len(parts) > 1 else None  # 图像宽度
-        height = parts[2] if len(parts) > 2 else None  # 图像高度
-        enhance = parts[3] if len(parts) > 3 else None  # 提示词增强
-        model = parts[4] if len(parts) > 4 else None  # 模型
-        seed = parts[5] if len(parts) > 5 else None  # 种子
+        # 解析参数 - 修复参数解析逻辑
+        # 查找第一个数字参数的位置（宽度参数），之前的所有内容都作为描述
+        description_parts = []
+        other_parts = []
+        found_number = False
+        
+        for part in parts:
+            if not found_number and part.isdigit():
+                found_number = True
+                other_parts.append(part)
+            elif found_number:
+                other_parts.append(part)
+            else:
+                description_parts.append(part)
+        
+        # 构建描述（将所有非数字部分连接起来）
+        description = " ".join(description_parts)
+        
+        # 解析其他参数
+        width = other_parts[0] if len(other_parts) > 0 else None  # 图像宽度
+        height = other_parts[1] if len(other_parts) > 1 else None  # 图像高度
+        enhance = other_parts[2] if len(other_parts) > 2 else None  # 提示词增强
+        model = other_parts[3] if len(other_parts) > 3 else None  # 模型
+        seed = other_parts[4] if len(other_parts) > 4 else None  # 种子
         
         # 构建API请求参数
         params = {"description": description}
