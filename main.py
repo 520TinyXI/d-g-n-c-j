@@ -3,6 +3,7 @@ import asyncio
 import os
 import json
 import datetime
+import time
 import aiohttp
 import urllib.parse
 import logging
@@ -1936,7 +1937,7 @@ class Main(Star):
                     # 解析json响应
                     try:
                         data = await resp.json()
-                    except json.jsondecodeerror as e:
+                    except json.JSONDecodeError as e:
                         logger.error(f"json解析错误：{e}")
                         return commandresult().error("我的世界查询失败：服务器返回了无效的json格式")
                     
@@ -2086,15 +2087,39 @@ class Main(Star):
         api_url = "https://api.lvlong.xyz/api/ai_image"
         
         try:
-            # 设置超时时间：连接超时10秒，总超时120秒（AI绘画可能需要更长时间）
-            timeout = aiohttp.ClientTimeout(total=120, connect=10)
+            # 设置超时时间：连接超时10秒，总超时180秒（AI绘画可能需要更长时间）
+            timeout = aiohttp.ClientTimeout(total=180, connect=10)
             async with aiohttp.ClientSession(timeout=timeout) as session:
+                # 记录请求开始时间
+                start_time = time.time()
+                logger.info(f"开始AI绘画请求，参数：{params}")
+                
                 async with session.get(api_url, params=params) as resp:
+                    # 记录响应时间
+                    response_time = time.time() - start_time
+                    logger.info(f"AI绘画API响应时间：{response_time:.2f}秒，状态码：{resp.status}")
+                    
                     if resp.status != 200:
+                        error_text = await resp.text()
+                        logger.error(f"AI绘画API返回错误状态码 {resp.status}，响应内容：{error_text}")
                         return CommandResult().error(f"AI绘画失败：服务器错误 (HTTP {resp.status})")
+                    
+                    # 检查响应内容类型
+                    content_type = resp.headers.get('content-type', '')
+                    if 'image' not in content_type:
+                        error_text = await resp.text()
+                        logger.error(f"AI绘画API返回了非图片内容，Content-Type: {content_type}，响应内容：{error_text}")
+                        return CommandResult().error(f"AI绘画失败：服务器返回了无效的数据格式")
                     
                     # 直接读取图片数据
                     image_data = await resp.read()
+                    
+                    # 检查图片数据大小
+                    if len(image_data) == 0:
+                        logger.error("AI绘画API返回了空的图片数据")
+                        return CommandResult().error("AI绘画失败：服务器返回了空的图片数据")
+                    
+                    logger.info(f"AI绘画成功，图片大小：{len(image_data)} 字节")
                     
                     # 保存图片到本地
                     try:
@@ -2102,6 +2127,7 @@ class Main(Star):
                             f.write(image_data)
                         return CommandResult().file_image("ai_generated_image.jpg")
                     except Exception as e:
+                        logger.error(f"保存AI绘画图片失败：{e}")
                         return CommandResult().error(f"保存AI绘画图片失败: {e}")
                         
         except aiohttp.ClientError as e:
